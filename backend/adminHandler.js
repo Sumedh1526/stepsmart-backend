@@ -188,6 +188,12 @@ async function createWeek(courseId, body) {
 // PATCH /admin/courses/{courseId}/weeks/{weekId}
 // Updates any subset of week fields. Commonly used to toggle visibility.
 async function updateWeek(courseId, weekId, body) {
+  // Guard: if this is actually a supplemental content update, redirect to the correct handler.
+  // This ensures data is always saved to SUPPLEMENTAL#GLOBAL (not WEEK#__supplemental__).
+  if (weekId === '__supplemental__') {
+    return await updateSupplementalContent(courseId, body);
+  }
+
   // Build a dynamic UpdateExpression from whatever fields were provided.
   const fields = ['title', 'description', 'youtubeUrl', 'qaLink', 'visible', 'weekNumber', 'quiz', 'resources', 'docs', 'assignments', 'liveRecordedSessions', 'calendarEvents'];
   const setClauses = [];
