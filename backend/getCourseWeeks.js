@@ -138,5 +138,8 @@ exports.handler = async (event) => {
     },
   }));
 
-  return res(200, { weeks, supplementalContent });
+  const modules = weeks.filter((w) => (w.category || 'module') === 'module');
+  const liveWeeks = weeks.filter((w) => w.category === 'live');
+
+  return res(200, { modules, liveWeeks, supplementalContent });
 };
