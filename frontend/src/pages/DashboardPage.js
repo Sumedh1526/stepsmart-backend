@@ -1506,7 +1506,7 @@ export default function DashboardPage() {
 
       const [weeksRes, progressRes, adminWeeksRes] = await Promise.all(requests);
 
-      const allWeeks = weeksRes.data.modules || [];
+      const allWeeks = weeksRes.data.modules || weeksRes.data.weeks || [];
       const liveWeeksList = weeksRes.data.liveWeeks || [];
       const legacySupplementalWeek = findLegacySupplementalWeek(allWeeks);
       const regularWeeks = allWeeks.filter((week) => week !== legacySupplementalWeek && week.weekId !== '__supplemental__');
