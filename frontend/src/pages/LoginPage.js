@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { enrollMasterclass, trackVisit } from '../utils/api';
 
 const styles = {
   container: {
@@ -10,84 +11,72 @@ const styles = {
   panel: {
     display: 'flex',
     flexDirection: 'column', justifyContent: 'center',
-    width: '60%', flexShrink: 0,
+    width: '55%', flexShrink: 0,
     backgroundImage: 'url(/learn/hero_image.png)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     position: 'relative',
   },
-  panelHeading: { fontSize: '2rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem' },
-  panelSub: { color: 'rgba(255,255,255,0.8)', fontSize: '1rem', lineHeight: 1.6 },
-  // Right login form area
+  // Right area scrollable
   formArea: {
-    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem',
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem',
+    overflowY: 'auto', maxHeight: '100vh',
   },
   card: {
-    background: 'var(--card)', borderRadius: '16px', padding: '2.5rem',
-    width: '100%', maxWidth: '420px',
+    background: 'var(--card)', borderRadius: '16px', padding: '2rem',
+    width: '100%', maxWidth: '440px',
     boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border)',
+    marginBottom: '1.5rem',
   },
-  brandRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' },
-  brandDot: {
-    width: '28px', height: '28px', borderRadius: '8px',
-    background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  brandDotInner: { width: '10px', height: '10px', borderRadius: '50%', background: '#fff' },
+  brandRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', width: '100%', maxWidth: '440px' },
   logo: { fontSize: '1.4rem', fontWeight: 800, color: 'var(--foreground)' },
-  subtitle: {
-    fontSize: '0.9rem', color: 'var(--muted-foreground)',
-    marginBottom: '2rem', marginTop: '0.25rem',
-  },
-  label: {
-    display: 'block', fontSize: '0.78rem', fontWeight: 700,
-    color: 'var(--foreground)', marginBottom: '0.4rem', letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-  },
+  navLinks: { display: 'flex', gap: '1rem' },
+  navLink: { fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 },
+  
+  title: { fontSize: '1.25rem', fontWeight: 800, color: 'var(--foreground)', marginBottom: '0.5rem' },
+  subtitle: { fontSize: '0.9rem', color: 'var(--muted-foreground)', marginBottom: '1.5rem' },
+  
+  label: { display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)', marginBottom: '0.4rem', textTransform: 'uppercase' },
   input: {
-    width: '100%', padding: '0.7rem 1rem', fontSize: '0.95rem',
-    border: '1.5px solid var(--border)', borderRadius: '8px', outline: 'none',
-    background: 'var(--background)', color: 'var(--foreground)',
-    marginBottom: '1rem', boxSizing: 'border-box',
-    transition: 'border-color 0.2s',
+    width: '100%', padding: '0.7rem 1rem', fontSize: '0.95rem', border: '1.5px solid var(--border)', borderRadius: '8px', 
+    outline: 'none', background: 'var(--background)', color: 'var(--foreground)', marginBottom: '1rem', boxSizing: 'border-box',
   },
   button: {
-    width: '100%', padding: '0.8rem', fontSize: '0.95rem', fontWeight: 700,
-    background: 'var(--primary)', color: 'var(--primary-foreground)',
-    border: 'none', borderRadius: '8px', cursor: 'pointer',
-    transition: 'background 0.2s', marginTop: '0.25rem', letterSpacing: '0.01em',
+    width: '100%', padding: '0.8rem', fontSize: '0.95rem', fontWeight: 700, background: 'var(--primary)', 
+    color: 'var(--primary-foreground)', border: 'none', borderRadius: '8px', cursor: 'pointer',
   },
-  error: {
-    background: 'hsl(0, 84%, 96%)', border: '1px solid var(--destructive)',
-    color: 'var(--destructive)', borderRadius: '8px',
-    padding: '0.7rem 1rem', fontSize: '0.875rem', marginBottom: '1rem',
+  secondaryButton: {
+    width: '100%', padding: '0.8rem', fontSize: '0.95rem', fontWeight: 700, background: 'transparent', 
+    color: 'var(--primary)', border: '1.5px solid var(--primary)', borderRadius: '8px', cursor: 'pointer', marginTop: '0.5rem',
   },
-  info: {
-    background: 'var(--accent)', border: '1px solid var(--primary)',
-    color: 'var(--accent-foreground)', borderRadius: '8px',
-    padding: '0.7rem 1rem', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: 1.5,
-  },
-  footerText: {
-    textAlign: 'center', color: 'var(--muted-foreground)',
-    fontSize: '0.78rem', marginTop: '1.75rem',
-  },
+  error: { background: 'hsl(0, 84%, 96%)', color: 'var(--destructive)', borderRadius: '8px', padding: '0.7rem 1rem', fontSize: '0.875rem', marginBottom: '1rem' },
+  success: { background: 'hsl(142, 76%, 96%)', color: 'var(--success)', borderRadius: '8px', padding: '0.7rem 1rem', fontSize: '0.875rem', marginBottom: '1rem' },
+  footerText: { textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.78rem', marginTop: '1rem' },
 };
 
 export default function LoginPage() {
   const { login, completeNewPassword } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState('login'); // 'login', 'newPassword', 'enroll'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  const [enrollData, setEnrollData] = useState({ name: '', email: '', phone: '' });
+  const [enrollSuccess, setEnrollSuccess] = useState(false);
+  
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    trackVisit('landing_page').catch(() => {});
+  }, []);
+
   async function handleLogin(e) {
     e.preventDefault();
-    setError('');
-    setSubmitting(true);
+    setError(''); setSubmitting(true);
     const result = await login(email, password);
     setSubmitting(false);
     if (result.requiresNewPassword) { setMode('newPassword'); return; }
@@ -95,16 +84,18 @@ export default function LoginPage() {
     navigate('/dashboard', { replace: true });
   }
 
-  async function handleNewPassword(e) {
+  async function handleEnroll(e) {
     e.preventDefault();
-    setError('');
-    if (newPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
-    if (newPassword.length < 8) { setError('Password must be at least 8 characters.'); return; }
-    setSubmitting(true);
-    const result = await completeNewPassword(newPassword);
-    setSubmitting(false);
-    if (result.error) { setError(result.error); return; }
-    navigate('/dashboard', { replace: true });
+    setError(''); setSubmitting(true);
+    try {
+      await enrollMasterclass(enrollData);
+      setEnrollSuccess(true);
+      setEnrollData({ name: '', email: '', phone: '' });
+    } catch (err) {
+      setError('Enrollment failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const [width, setWidth] = useState(window.innerWidth);
@@ -119,86 +110,81 @@ export default function LoginPage() {
   return (
     <div style={styles.container}>
       {showPanel && <div style={styles.panel} />}
+      
       <div style={styles.formArea}>
-        <div style={styles.card}>
-          {/* Brand */}
-          <div style={styles.brandRow}>
-            <div style={styles.brandDot}>
-              <div style={styles.brandDotInner} />
-            </div>
-            <div style={styles.logo}>StepSmart</div>
+        <div style={styles.brandRow}>
+          <div style={styles.logo}>StepSmart</div>
+          <div style={styles.navLinks}>
+            <a href="https://chat.whatsapp.com/your-community-link" target="_blank" rel="noreferrer" style={styles.navLink}>Community</a>
+            <a href="https://calendly.com/sanket-stepsmart" target="_blank" rel="noreferrer" style={styles.navLink}>Book 1:1</a>
           </div>
-          <div style={styles.subtitle}>
-            {mode === 'login' ? 'Sign in to your learning portal' : 'Create your permanent password'}
-          </div>
+        </div>
 
+        {/* Enrollment Section */}
+        <div style={styles.card}>
+          <div style={styles.title}>Join the Next Masterclass</div>
+          <div style={styles.subtitle}>Enter your details to reserve your spot for the upcoming cohort.</div>
+          
+          {enrollSuccess ? (
+            <div style={styles.success}>Thanks! We've received your enrollment request. We will reach out soon.</div>
+          ) : (
+            <form onSubmit={handleEnroll}>
+              <label style={styles.label}>Full Name</label>
+              <input style={styles.input} type="text" placeholder="John Doe" required 
+                value={enrollData.name} onChange={e => setEnrollData({...enrollData, name: e.target.value})} />
+              
+              <label style={styles.label}>Email Address</label>
+              <input style={styles.input} type="email" placeholder="john@example.com" required 
+                value={enrollData.email} onChange={e => setEnrollData({...enrollData, email: e.target.value})} />
+              
+              <label style={styles.label}>Phone Number</label>
+              <input style={styles.input} type="tel" placeholder="+91 98765 43210" 
+                value={enrollData.phone} onChange={e => setEnrollData({...enrollData, phone: e.target.value})} />
+              
+              <button style={{...styles.button, opacity: submitting ? 0.6 : 1}} type="submit" disabled={submitting}>
+                {submitting ? 'Submitting...' : 'Register for Masterclass →'}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Login Section */}
+        <div style={styles.card}>
+          <div style={styles.title}>LMS Student Portal</div>
+          <div style={styles.subtitle}>Already a member? Sign in to access your course modules and sessions.</div>
+          
           {error && <div style={styles.error}>{error}</div>}
 
           {mode === 'login' ? (
             <form onSubmit={handleLogin}>
               <label style={styles.label}>Email address</label>
-              <input
-                style={styles.input}
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoFocus
-              />
+              <input style={styles.input} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
               <label style={styles.label}>Password</label>
-              <input
-                style={styles.input}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-              <button
-                style={{ ...styles.button, opacity: submitting ? 0.65 : 1 }}
-                type="submit"
-                disabled={submitting}
-              >
-                {submitting ? 'Signing in…' : 'Sign In →'}
+              <input style={styles.input} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+              <button style={{ ...styles.button, opacity: submitting ? 0.65 : 1 }} type="submit" disabled={submitting}>
+                {submitting ? 'Signing in…' : 'Sign In to Portal →'}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleNewPassword}>
-              <div style={styles.info}>
-                Your account requires a new password before you can access the portal.
-              </div>
-              <label style={styles.label}>New password</label>
-              <input
-                style={styles.input}
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                required
-                autoFocus
-              />
-              <label style={styles.label}>Confirm password</label>
-              <input
-                style={styles.input}
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat new password"
-                required
-              />
-              <button
-                style={{ ...styles.button, opacity: submitting ? 0.65 : 1 }}
-                type="submit"
-                disabled={submitting}
-              >
-                {submitting ? 'Setting password…' : 'Set Password & Continue →'}
-              </button>
-            </form>
+             <form onSubmit={async (e) => {
+               e.preventDefault();
+               setError(''); setSubmitting(true);
+               if (newPassword !== confirmPassword) { setError('Passwords do not match.'); setSubmitting(false); return; }
+               const res = await completeNewPassword(newPassword);
+               setSubmitting(false);
+               if (res.error) setError(res.error); else navigate('/dashboard');
+             }}>
+                <div style={styles.info}>Set your new password below.</div>
+                <label style={styles.label}>New password</label>
+                <input style={styles.input} type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                <label style={styles.label}>Confirm password</label>
+                <input style={styles.input} type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                <button style={styles.button} type="submit" disabled={submitting}>Set Password & Login</button>
+             </form>
           )}
-
-          <div style={styles.footerText}>StepSmart · Product Management</div>
         </div>
+
+        <div style={styles.footerText}>StepSmart · Product Management Career Accelerator</div>
       </div>
     </div>
   );

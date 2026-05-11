@@ -151,4 +151,12 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
   });
 }
 
+// ─── Public ──────────────────────────────────────────────────────────────────
+
+export const enrollMasterclass = (data) =>
+  api.post('/public/enroll', data);
+
+export const trackVisit = (page) =>
+  api.post('/public/track', { page, visitorId: localStorage.getItem('visitor_id') });
+
 export default api;
