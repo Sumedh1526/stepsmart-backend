@@ -868,12 +868,14 @@ Without proxy integration, API Gateway does transformation — you'd configure r
 ### Route matching
 
 ```
-POST /progress/heartbeat      → lms-heartbeat Lambda
-GET  /progress/{courseId}     → lms-getProgress Lambda
-POST /quiz/submit             → lms-submitQuiz Lambda
-GET  /courses/my              → lms-getMyCourses Lambda
-GET  /courses/{courseId}/weeks → lms-getCourseWeeks Lambda
-ALL  /admin/*                 → lms-admin Lambda
+lms-admin                 → all /admin/* routes
+lms-student               → GET /courses/my
+lms-student               → GET /courses/{courseId}/weeks
+lms-student               → GET /progress/{courseId}
+lms-student               → POST /progress/heartbeat
+lms-student               → POST /quiz/submit
+lms-uploadAssignment      → POST /assignments/upload
+lms-getStudentAssignments → GET /courses/{courseId}/weeks/{weekId}/assignments, if registered
 ```
 
 `{courseId}` in the path is a **path parameter** — API Gateway extracts it and passes it in `event.pathParameters.courseId`.
@@ -1192,3 +1194,25 @@ Every week:
 | Lambda error logs | CloudWatch → Log groups → /aws/lambda/lms-[name] |
 | API Gateway request logs | API Gateway → Stages → prod → Logs |
 | See all course/week items | DynamoDB → lms-courses → Explore items |
+
+---
+
+## ASSIGNMENT UPLOAD ARCHITECTURE
+
+```
+Browser -> API Gateway -> uploadAssignment Lambda -> private Supabase Storage
+                                          -> DynamoDB metadata write
+```
+
+- **Storage**: Files are uploaded directly to a private Supabase Storage bucket.
+- **Metadata**: Stable metadata (including `storagePath`) is written to the DynamoDB `lms-assignments` table.
+- **Links**: `storagePath` is canonical. The `driveUrl` stored at upload time is a temporary signed URL and should not be relied upon long-term.
+
+---
+
+## KNOWN DEBT
+
+- Remove `correctAnswers` from quiz responses after updating `QuizComponent`.
+- Register `GET /courses/{courseId}/weeks/{weekId}/assignments` in API Gateway when the frontend starts using `getStudentAssignments`.
+- Generate fresh signed URLs in `getStudentAssignments` from `storagePath` once that route is live.
+- Decide whether `getStudentAssignments` should later fold into `lms-student` for a strict two-Lambda backend.
