@@ -50,9 +50,11 @@ const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stepsmart.net';
 const SUPPLEMENTAL_SK = 'SUPPLEMENTAL#GLOBAL';
 
+let currentOrigin = FRONTEND_URL;
+
 function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin': FRONTEND_URL,
+    'Access-Control-Allow-Origin': currentOrigin,
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
   };
@@ -66,6 +68,57 @@ function res(statusCode, body) {
   };
 }
 
+async function signRecordedSessions(sessions) {
+  if (!Array.isArray(sessions) || sessions.length === 0) return sessions;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+
+  if (!supabaseUrl || !serviceRoleKey || !bucket) {
+    console.warn('Supabase storage credentials not fully configured for signing.');
+    return sessions;
+  }
+
+  const signedSessions = [];
+  for (const session of sessions) {
+    if (session.storageProvider === 'supabase' && session.storagePath) {
+      try {
+        const signedUrlRes = await fetch(
+          `${supabaseUrl}/storage/v1/object/sign/${bucket}/${session.storagePath}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              apikey: serviceRoleKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ expiresIn: 60 * 60 * 8 }),
+          }
+        );
+        if (signedUrlRes.ok) {
+          const resBody = await signedUrlRes.json();
+          const rawSigned = resBody.signedUrl || resBody.signedURL || '';
+          const fullSignedUrl = rawSigned.startsWith('http')
+            ? rawSigned
+            : `${supabaseUrl}/storage/v1${rawSigned}`;
+          signedSessions.push({
+            ...session,
+            url: fullSignedUrl,
+          });
+          continue;
+        } else {
+          console.error(`Supabase returned status ${signedUrlRes.status} for signing path ${session.storagePath}`);
+        }
+      } catch (err) {
+        console.error('Error generating signed URL for session path:', session.storagePath, err);
+      }
+    }
+    signedSessions.push(session);
+  }
+  return signedSessions;
+}
+
 async function getSupplementalContent(courseId) {
   const result = await ddb.send(new GetCommand({
     TableName: COURSES_TABLE,
@@ -73,9 +126,12 @@ async function getSupplementalContent(courseId) {
   }));
 
   const item = result.Item || {};
+  const rawSessions = Array.isArray(item.liveRecordedSessions) ? item.liveRecordedSessions : [];
+  const signedSessions = await signRecordedSessions(rawSessions);
+
   return {
     assignments: Array.isArray(item.assignments) ? item.assignments : [],
-    liveRecordedSessions: Array.isArray(item.liveRecordedSessions) ? item.liveRecordedSessions : [],
+    liveRecordedSessions: signedSessions,
     calendarEvents: Array.isArray(item.calendarEvents) ? item.calendarEvents : [],
     updatedAt: item.updatedAt || null,
     createdAt: item.createdAt || null,
@@ -237,6 +293,60 @@ async function updateWeek(courseId, weekId, body) {
 }
 
 async function updateSupplementalContent(courseId, body) {
+  if (body && body.action === 'getUploadUrl') {
+    const { fileName, mimeType } = body;
+    if (!fileName) {
+      return res(400, { message: 'fileName is required for getUploadUrl action' });
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+
+    if (!supabaseUrl || !serviceRoleKey || !bucket) {
+      return res(500, { message: 'Supabase credentials not configured on backend' });
+    }
+
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const storagePath = `global-sessions/${Date.now()}-${safeFileName}`;
+
+    try {
+      const uploadSignRes = await fetch(
+        `${supabaseUrl}/storage/v1/object/upload/sign/${bucket}/${storagePath}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            apikey: serviceRoleKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (uploadSignRes.ok) {
+        const signBody = await uploadSignRes.json();
+        const rawUrl = signBody.url || signBody.signedUrl || signBody.signedURL || '';
+        const fullUrl = rawUrl.startsWith('http')
+          ? rawUrl
+          : `${supabaseUrl}/storage/v1${rawUrl}`;
+
+        return res(200, {
+          signedUrl: fullUrl,
+          storagePath,
+          storageProvider: 'supabase',
+        });
+      } else {
+        const errorText = await uploadSignRes.text();
+        console.error('Supabase signed upload URL fetch error:', errorText);
+        return res(500, { message: `Supabase upload signing failed: ${errorText}` });
+      }
+    } catch (err) {
+      console.error('Error fetching signed upload URL from Supabase:', err);
+      return res(500, { message: err.message || 'Internal server error' });
+    }
+  }
+
   const hasSupportedField = ['assignments', 'liveRecordedSessions', 'calendarEvents']
     .some((field) => body[field] !== undefined);
   if (!hasSupportedField) {
@@ -302,9 +412,57 @@ async function getCourseProgress(courseId) {
   return res(200, { progress });
 }
 
+// GET /admin/courses/{courseId}/submissions
+async function getSubmissions(courseId) {
+  const result = await ddb.send(new ScanCommand({
+    TableName: process.env.ASSIGNMENTS_TABLE || process.env.ASSIGNMENT_TABLE || 'lms-assignments',
+    FilterExpression: 'courseId = :cid',
+    ExpressionAttributeValues: { ':cid': courseId },
+  }));
+
+  const submissions = result.Items || [];
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET;
+
+  if (supabaseUrl && serviceRoleKey && bucket) {
+    for (const sub of submissions) {
+      if (sub.storageProvider === 'supabase' && sub.storagePath) {
+        try {
+          const signedUrlRes = await fetch(
+            `${supabaseUrl}/storage/v1/object/sign/${bucket}/${sub.storagePath}`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                apikey: serviceRoleKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ expiresIn: 60 * 60 * 8 }),
+            }
+          );
+          if (signedUrlRes.ok) {
+            const body = await signedUrlRes.json();
+            const rawSigned = body.signedUrl || body.signedURL || '';
+            sub.driveUrl = rawSigned.startsWith('http') ? rawSigned : `${supabaseUrl}/storage/v1${rawSigned}`;
+          }
+        } catch (err) {
+          console.error('Error generating signed URL for', sub.storagePath, err);
+        }
+      }
+    }
+  }
+
+  submissions.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+
+  return res(200, { submissions });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
+  currentOrigin = event?.headers?.origin || event?.headers?.Origin || FRONTEND_URL;
   if (event.httpMethod === 'OPTIONS') return res(200, {});
 
   // Layer 2 admin check — even if React's AdminRoute is bypassed, this rejects non-admins.
@@ -343,6 +501,9 @@ exports.handler = async (event) => {
 
     // ── Progress ──────────────────────────────────────────────────────
     if (method === 'GET' && resource === '/admin/courses/{courseId}/progress') return await getCourseProgress(courseId);
+
+    // ── Assignments ──────────────────────────────────────────────────────
+    if (method === 'GET' && resource === '/admin/courses/{courseId}/submissions') return await getSubmissions(courseId);
 
     return res(404, { message: `No handler for ${method} ${resource}` });
   } catch (err) {

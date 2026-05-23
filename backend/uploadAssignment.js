@@ -9,9 +9,11 @@ const ddb = DynamoDBDocumentClient.from(
   new DynamoDBClient({ region: process.env.AWS_REGION }),
 );
 
-const ASSIGNMENTS_TABLE = process.env.ASSIGNMENTS_TABLE || 'lms-assignments';
+const ASSIGNMENTS_TABLE = process.env.ASSIGNMENTS_TABLE || process.env.ASSIGNMENT_TABLE || 'lms-assignments';
 const FRONTEND_URL      = process.env.FRONTEND_URL || 'https://stepsmart.net';
 const MAX_FILE_BYTES    = 7 * 1024 * 1024; // 7 MB original-file limit
+
+let currentOrigin = FRONTEND_URL;
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -25,7 +27,7 @@ const ALLOWED_MIME_TYPES = new Set([
 
 function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin':  FRONTEND_URL,
+    'Access-Control-Allow-Origin':  currentOrigin,
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Allow-Methods': 'POST,OPTIONS',
   };
@@ -36,6 +38,7 @@ function res(statusCode, body) {
 }
 
 exports.handler = async (event) => {
+  currentOrigin = event?.headers?.origin || event?.headers?.Origin || FRONTEND_URL;
   if (event.httpMethod === 'OPTIONS') return res(200, {});
 
   const userId = event.requestContext?.authorizer?.claims?.sub;
@@ -104,7 +107,10 @@ exports.handler = async (event) => {
     );
 
     const signedUrlBody = await signedUrlRes.json();
-    const signedUrl = signedUrlBody.signedUrl ?? signedUrlBody.signedURL;
+    const rawSigned = signedUrlBody.signedUrl ?? signedUrlBody.signedURL ?? '';
+    const signedUrl = rawSigned.startsWith('http')
+      ? rawSigned
+      : `${supabaseUrl}/storage/v1${rawSigned}`;
 
     if (!signedUrlRes.ok || !signedUrl) {
       console.error('Supabase signed URL error:', signedUrlBody);

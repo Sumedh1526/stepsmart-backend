@@ -8,6 +8,7 @@ import {
   adminUpdateWeek,
   adminDeleteWeek,
   adminGetAllProgress,
+  adminGetAllSubmissions,
 } from '../utils/api';
 
 const COURSE_ID = 'course-001';
@@ -876,6 +877,424 @@ function WeeksTab() {
             )}
       </div>
     </div >
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────────
+// Supplemental Content Tab
+// ────────────────────────────────────────────────────────────────────────────────
+function RecordedSessionEditor({ rec, i, updateItem, removeItem, courseId }) {
+  const [uploadMode, setUploadMode] = useState(
+    rec.storageProvider === 'supabase' ? 'file' : 'url'
+  );
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = React.useRef(null);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setProgress(0);
+    setUploadError('');
+    try {
+      const uploadUrlRes = await adminUpdateSupplementalContent(courseId, {
+        action: 'getUploadUrl',
+        fileName: file.name,
+        mimeType: file.type,
+      });
+      const { signedUrl, storagePath, storageProvider } = uploadUrlRes.data;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', signedUrl, true);
+      xhr.setRequestHeader('Content-Type', file.type);
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          setProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+      
+      xhr.onload = () => {
+        if (xhr.status === 200 || xhr.status === 201) {
+          updateItem('liveRecordedSessions', i, 'url', signedUrl);
+          updateItem('liveRecordedSessions', i, 'storagePath', storagePath);
+          updateItem('liveRecordedSessions', i, 'storageProvider', storageProvider);
+          setUploading(false);
+          setProgress(100);
+        } else {
+          setUploadError(`Upload failed status: ${xhr.status}`);
+          setUploading(false);
+        }
+      };
+      
+      xhr.onerror = () => {
+        setUploadError('Upload network error.');
+        setUploading(false);
+      };
+      
+      xhr.send(file);
+    } catch (err) {
+      setUploadError(err.response?.data?.message || 'Signed URL generation failed.');
+      setUploading(false);
+    }
+  };
+
+  const getFileName = (path) => {
+    if (!path) return '';
+    return path.split('/').pop().replace(/^\d+-/, '');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (uploading) return;
+    const files = e.dataTransfer.files;
+    if (files && files[0]) {
+      const file = files[0];
+      const eFake = { target: { files: [file] } };
+      handleFileChange(eFake);
+    }
+  };
+
+  const toggleContainerStyle = {
+    display: 'flex',
+    background: 'hsl(195, 83%, 97%)',
+    borderRadius: '10px',
+    padding: '3px',
+    marginBottom: '1rem',
+    border: '1px solid var(--border)',
+  };
+
+  const toggleButtonStyle = (active) => ({
+    flex: 1,
+    padding: '0.45rem',
+    borderRadius: '8px',
+    fontSize: '0.775rem',
+    fontWeight: 600,
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'center',
+    background: active ? '#fff' : 'transparent',
+    color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+    transition: 'all 0.2s ease',
+  });
+
+  const dropZoneStyle = {
+    border: '1.5px dashed var(--border)',
+    borderRadius: '12px',
+    padding: '1.25rem',
+    textAlign: 'center',
+    background: 'var(--background)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.4rem',
+  };
+
+  return (
+    <div style={{ ...s.qPanel, border: '1px solid var(--border)', background: '#fff', boxShadow: 'var(--shadow-sm)', padding: '1.25rem', borderRadius: '12px', marginBottom: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.55rem' }}>
+        <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary)' }}>Session #{i + 1}</span>
+        <button type="button" style={{ ...s.btn, ...s.btnDanger, padding: '0.25rem 0.55rem', fontSize: '0.725rem', borderRadius: '6px' }} onClick={() => removeItem('liveRecordedSessions', i)}>✕ Remove</button>
+      </div>
+
+      <label style={s.label}>Session Title</label>
+      <input style={s.input} placeholder="e.g. Saturday Live Lecture: Prioritization" value={rec.title} onChange={e => updateItem('liveRecordedSessions', i, 'title', e.target.value)} />
+
+      <label style={s.label}>Description</label>
+      <textarea style={{ ...s.textarea, height: '60px' }} placeholder="What was covered in this session?" value={rec.description} onChange={e => updateItem('liveRecordedSessions', i, 'description', e.target.value)} />
+
+      <label style={s.label}>Video Content Source</label>
+      <div style={toggleContainerStyle}>
+        <button type="button" style={toggleButtonStyle(uploadMode === 'file')} onClick={() => setUploadMode('file')}>📁 Upload Video File</button>
+        <button type="button" style={toggleButtonStyle(uploadMode === 'url')} onClick={() => setUploadMode('url')}>🔗 Video URL</button>
+      </div>
+
+      {uploadMode === 'url' ? (
+        <div>
+          <label style={s.label}>Video URL</label>
+          <input style={{ ...s.input, marginBottom: 0 }} placeholder="e.g. https://youtube.com/... or Vimeo/Zoom link" value={rec.url || ''} onChange={e => {
+            updateItem('liveRecordedSessions', i, 'url', e.target.value);
+            updateItem('liveRecordedSessions', i, 'storagePath', '');
+            updateItem('liveRecordedSessions', i, 'storageProvider', '');
+          }} />
+        </div>
+      ) : (
+        <div>
+          {uploading ? (
+            <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '12px', background: 'var(--background)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.775rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                <span>Uploading screen recording...</span>
+                <span>{progress}%</span>
+              </div>
+              <div style={{ height: '8px', background: 'hsl(195, 83%, 94%)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress}%`, background: 'var(--primary)', borderRadius: '4px', transition: 'width 0.1s linear' }} />
+              </div>
+            </div>
+          ) : rec.storagePath ? (
+            <div style={{ padding: '0.85rem 1rem', border: '1px solid hsl(142, 72%, 80%)', borderRadius: '12px', background: 'hsl(142, 72%, 97%)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                <span style={{ fontSize: '1.2rem' }}>✅</span>
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'hsl(142, 72%, 20%)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {getFileName(rec.storagePath)}
+                  </span>
+                  <span style={{ fontSize: '0.675rem', color: 'hsl(142, 72%, 30%)' }}>Saved to Supabase Storage</span>
+                </div>
+              </div>
+              <button type="button" style={{ ...s.btn, padding: '0.2rem 0.5rem', fontSize: '0.675rem', borderRadius: '6px', minWidth: 'fit-content' }} onClick={() => fileInputRef.current?.click()}>Replace</button>
+            </div>
+          ) : (
+            <div style={dropZoneStyle} onDragOver={handleDragOver} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>
+              <span style={{ fontSize: '1.5rem' }}>☁️</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>Click to browse or drag video here</span>
+              <span style={{ fontSize: '0.625rem', color: 'var(--muted-foreground)' }}>Supports MP4, WebM, MOV</span>
+            </div>
+          )}
+          
+          <input ref={fileInputRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleFileChange} />
+          {uploadError && <p style={{ color: 'var(--destructive)', fontSize: '0.7rem', marginTop: '0.4rem', fontWeight: 600 }}>⚠️ {uploadError}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupplementalContentTab() {
+  const [data, setData] = useState({ assignments: [], liveRecordedSessions: [], calendarEvents: [] });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    try {
+      const { data: resData } = await adminGetWeeks(COURSE_ID);
+      setData(normalizeSupplementalContent(resData.supplementalContent));
+    } catch {
+      setMessage('Failed to load supplemental content.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function normalizeSupplementalContent(raw) {
+    return {
+      assignments: Array.isArray(raw?.assignments) ? raw.assignments : [],
+      liveRecordedSessions: Array.isArray(raw?.liveRecordedSessions) ? raw.liveRecordedSessions : [],
+      calendarEvents: Array.isArray(raw?.calendarEvents) ? raw.calendarEvents : [],
+    };
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true); setMessage('');
+    try {
+      await adminUpdateSupplementalContent(COURSE_ID, data);
+      setMessage('Supplemental content saved successfully!');
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Helpers
+  const addItem = (key, empty) => setData(d => ({ ...d, [key]: [...d[key], { ...empty, id: makeClientId(key === 'liveRecordedSessions' ? 'rec' : key.slice(0, 3)) }] }));
+  const updateItem = (key, idx, field, val) => setData(d => {
+    const list = [...d[key]];
+    list[idx] = { ...list[idx], [field]: val };
+    return { ...d, [key]: list };
+  });
+  const removeItem = (key, idx) => setData(d => ({ ...d, [key]: d[key].filter((_, i) => i !== idx) }));
+
+  if (loading) return <p style={{ color: 'var(--muted-foreground)', padding: '2rem 0', textAlign: 'center' }}>Loading supplemental content assets...</p>;
+
+  return (
+    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      
+      {/* Intro Banner Card */}
+      <div style={{
+        background: 'linear-gradient(135deg, hsl(195, 83%, 98%) 0%, hsl(195, 83%, 95%) 100%)',
+        border: '1px dashed rgba(195, 83%, 38%, 0.3)',
+        borderRadius: '16px',
+        padding: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.4rem',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
+        <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>📚</span> Course Supplemental Assets
+        </div>
+        <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
+          Customize and publish course-wide assets including live recordings, assignments, and calendar events. Changes here are immediately reflected on the student dashboards.
+        </div>
+      </div>
+
+      {message && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          borderRadius: '10px',
+          background: message.includes('failed') || message.includes('Failed') ? 'hsl(0, 84%, 96%)' : 'var(--success-light)',
+          color: message.includes('failed') || message.includes('Failed') ? 'var(--destructive)' : 'var(--success)',
+          border: `1px solid ${message.includes('failed') || message.includes('Failed') ? 'var(--destructive)' : 'var(--success)'}`,
+          fontWeight: 600,
+          fontSize: '0.875rem'
+        }}>
+          {message}
+        </div>
+      )}
+
+      {/* Global Recorded Sessions Card */}
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ ...s.cardTitle, marginBottom: '0.2rem' }}>🎥 Global Recorded Sessions</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Upload live session and recorded lecture videos visible to all students.</div>
+          </div>
+          <button type="button" style={s.btn} onClick={() => addItem('liveRecordedSessions', EMPTY_RECORDED_SESSION)}>+ Add Recorded Session</button>
+        </div>
+
+        {data.liveRecordedSessions.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', border: '1.5px dashed var(--border)', borderRadius: '12px', background: 'var(--background)' }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>🎥</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>No global recorded sessions added yet.</span>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            {data.liveRecordedSessions.map((rec, i) => (
+              <RecordedSessionEditor
+                key={rec.id || i}
+                rec={rec}
+                i={i}
+                updateItem={updateItem}
+                removeItem={removeItem}
+                courseId={COURSE_ID}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Global Course Assignments Card */}
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ ...s.cardTitle, marginBottom: '0.2rem' }}>📝 Global Course Assignments</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Create capstone assignments or course-wide submissions that all students must submit.</div>
+          </div>
+          <button type="button" style={s.btn} onClick={() => addItem('assignments', EMPTY_ASSIGNMENT)}>+ Add Assignment</button>
+        </div>
+
+        {data.assignments.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', border: '1.5px dashed var(--border)', borderRadius: '12px', background: 'var(--background)' }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>📝</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>No global assignments added yet.</span>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            {data.assignments.map((asgn, i) => (
+              <div key={asgn.id || i} style={{ ...s.qPanel, border: '1px solid var(--border)', background: '#fff', boxShadow: 'var(--shadow-sm)', padding: '1.25rem', borderRadius: '12px', marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.55rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary)' }}>Assignment #{i + 1}</span>
+                  <button type="button" style={{ ...s.btn, ...s.btnDanger, padding: '0.25rem 0.55rem', fontSize: '0.725rem', borderRadius: '6px' }} onClick={() => removeItem('assignments', i)}>✕ Remove</button>
+                </div>
+                <label style={s.label}>Assignment Title</label>
+                <input style={s.input} placeholder="e.g. Capstone Project: PRD Draft" value={asgn.title} onChange={e => updateItem('assignments', i, 'title', e.target.value)} />
+                <label style={s.label}>Instructions & Description</label>
+                <textarea style={{ ...s.textarea, marginBottom: 0, minHeight: '100px' }} placeholder="Provide detailed instructions and grading criteria..." value={asgn.description} onChange={e => updateItem('assignments', i, 'description', e.target.value)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Global Course Calendar Events Card */}
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <div style={{ ...s.cardTitle, marginBottom: '0.2rem' }}>📅 Global Course Calendar Events</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Schedule cohort-wide onboarding bootcamps, Live sessions, and deadlines.</div>
+          </div>
+          <button type="button" style={s.btn} onClick={() => addItem('calendarEvents', EMPTY_CALENDAR_EVENT)}>+ Add Calendar Event</button>
+        </div>
+
+        {data.calendarEvents.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', border: '1.5px dashed var(--border)', borderRadius: '12px', background: 'var(--background)' }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>📅</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>No global calendar events created yet.</span>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1.25rem' }}>
+            {data.calendarEvents.map((evt, i) => (
+              <div key={evt.id || i} style={{ ...s.qPanel, border: '1px solid var(--border)', background: '#fff', boxShadow: 'var(--shadow-sm)', padding: '1.25rem', borderRadius: '12px', marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.55rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--primary)' }}>Event #{i + 1}</span>
+                  <button type="button" style={{ ...s.btn, ...s.btnDanger, padding: '0.25rem 0.55rem', fontSize: '0.725rem', borderRadius: '6px' }} onClick={() => removeItem('calendarEvents', i)}>✕ Remove</button>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <label style={s.label}>Event Category</label>
+                    <select style={{ ...s.input, marginBottom: 0 }} value={evt.kind || ''} onChange={e => updateItem('calendarEvents', i, 'kind', e.target.value)}>
+                      <option value="">Select Kind</option>
+                      <option value="Course Module">Course Module</option>
+                      <option value="Interview Module">Interview Module</option>
+                      <option value="Recorded Video Upload">Recorded Video Upload</option>
+                      <option value="Live Q&A">Live Q&A</option>
+                      <option value="Orientation">Orientation</option>
+                      <option value="Homework Deadline">Homework Deadline</option>
+                      <option value="Other Event">Other Event</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={s.label}>Event Title</label>
+                    <input style={{ ...s.input, marginBottom: 0 }} placeholder="e.g. Q&A, Bootcamp Kickoff" value={evt.title || ''} onChange={e => updateItem('calendarEvents', i, 'title', e.target.value)} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <label style={s.label}>Start Date</label>
+                    <input type="date" style={{ ...s.input, marginBottom: 0 }} value={evt.startDate || ''} onChange={e => updateItem('calendarEvents', i, 'startDate', e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={s.label}>End Date (Optional)</label>
+                    <input type="date" style={{ ...s.input, marginBottom: 0 }} value={evt.endDate || ''} onChange={e => updateItem('calendarEvents', i, 'endDate', e.target.value)} />
+                  </div>
+                </div>
+
+                <label style={s.label}>Description</label>
+                <textarea style={{ ...s.textarea, minHeight: '60px', marginBottom: 0 }} placeholder="Provide brief details for the calendar Detail Popover..." value={evt.description || ''} onChange={e => updateItem('calendarEvents', i, 'description', e.target.value)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+        <button style={{ ...s.btn, padding: '0.85rem 2.5rem', fontSize: '0.9rem', borderRadius: '10px', boxShadow: 'var(--shadow-md)' }} type="submit" disabled={saving}>
+          {saving ? 'Saving changes...' : 'Save Supplemental Content ✓'}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -960,6 +1379,117 @@ function ProgressTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// Submissions Tab
+// ────────────────────────────────────────────────────────────────────────────────
+function SubmissionsTab() {
+  const [submissions, setSubmissions] = useState([]);
+  const [students, setStudents] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    try {
+      const [subRes, stuRes] = await Promise.all([
+        adminGetAllSubmissions(COURSE_ID),
+        adminGetStudents()
+      ]);
+      setSubmissions(subRes.data.submissions || []);
+      
+      const studentMap = {};
+      for (const st of (stuRes.data.students || [])) {
+        studentMap[st.Username] = {
+          name: st.name || st.email || st.Username,
+          email: st.email || ''
+        };
+      }
+      setStudents(studentMap);
+    } catch {
+      setError('Failed to load submissions.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = submissions.filter(sub => {
+    const term = search.toLowerCase();
+    const studentInfo = students[sub.userId] || {};
+    const stSearchStr = `${studentInfo.name || ''} ${studentInfo.email || ''}`.toLowerCase();
+    const asgnName = (sub.assignmentTitle || sub.fileName || '').toLowerCase();
+    return stSearchStr.includes(term) || asgnName.includes(term);
+  });
+
+  if (loading) return <p style={{ color: 'var(--muted-foreground)' }}>Loading…</p>;
+  if (error) return <p style={{ color: 'var(--destructive)' }}>{error}</p>;
+
+  return (
+    <div style={s.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <div style={s.cardTitle}>Student Submissions — {COURSE_ID}</div>
+        <input 
+          style={{ ...s.input, width: '250px', marginBottom: 0 }} 
+          placeholder="Search by student or assignment..." 
+          value={search} 
+          onChange={e => setSearch(e.target.value)} 
+        />
+      </div>
+      
+      {submissions.length === 0 ? <p style={{ color: 'var(--muted-foreground)' }}>No submissions recorded yet.</p> : (
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Student</th>
+              <th style={s.th}>Assignment</th>
+              <th style={s.th}>Week</th>
+              <th style={s.th}>Submitted At</th>
+              <th style={s.th}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((sub, i) => (
+              <tr key={i}>
+                <td style={s.td}>
+                  {students[sub.userId] ? (
+                    <>
+                      <div style={{ fontWeight: 600 }}>{students[sub.userId].name}</div>
+                      {students[sub.userId].email && students[sub.userId].name !== students[sub.userId].email && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{students[sub.userId].email}</div>
+                      )}
+                    </>
+                  ) : (
+                    sub.userId?.slice(0, 8) + '…'
+                  )}
+                </td>
+                <td style={s.td}>
+                  <div style={{ fontWeight: 600 }}>{sub.assignmentTitle || '—'}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{sub.fileName}</div>
+                </td>
+                <td style={s.td}>{sub.weekId}</td>
+                <td style={s.td}>{new Date(sub.uploadedAt).toLocaleString()}</td>
+                <td style={s.td}>
+                  {sub.driveUrl ? (
+                    <a href={sub.driveUrl} target="_blank" rel="noreferrer" style={{ ...s.btn, textDecoration: 'none', display: 'inline-block' }}>Open ↗</a>
+                  ) : 'No Link'}
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan="5" style={{ ...s.td, textAlign: 'center', color: 'var(--muted-foreground)' }}>
+                  No matches found for "{search}"
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // Main Admin Page
 // ────────────────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
@@ -978,6 +1508,7 @@ export default function AdminPage() {
           { id: 'weeks', label: 'Manage Weeks' },
           { id: 'students', label: 'Students' },
           { id: 'progress', label: 'Progress' },
+          { id: 'submissions', label: 'Submissions' },
         ].map((t) => (
           <button
             key={t.id}
@@ -993,6 +1524,7 @@ export default function AdminPage() {
         {tab === 'weeks' && <WeeksTab />}
         {tab === 'students' && <StudentsTab />}
         {tab === 'progress' && <ProgressTab />}
+        {tab === 'submissions' && <SubmissionsTab />}
       </div>
     </div>
   );
