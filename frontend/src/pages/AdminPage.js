@@ -9,6 +9,7 @@ import {
   adminDeleteWeek,
   adminGetAllProgress,
   adminGetAllSubmissions,
+  adminUpdateSupplementalContent,
 } from '../utils/api';
 
 const COURSE_ID = 'course-001';
@@ -211,6 +212,7 @@ const EMPTY_WEEK = {
   weekNumber: '',
   youtubeUrl: '',
   qaLink: '',
+  transcript: '',
   quiz: { questions: [] },
   resources: [],
   docs: [],
@@ -310,6 +312,7 @@ function WeeksTab() {
       title: week.title, description: week.description, weekNumber: String(week.weekNumber),
       youtubeUrl: week.youtubeUrl || '',
       qaLink: week.qaLink || '',
+      transcript: week.transcript || '',
       quiz: week.quiz || { questions: [] },
       resources: week.resources || [],
       docs: week.docs || [],
@@ -549,6 +552,11 @@ function WeeksTab() {
             <label style={s.label}>Description</label>
             <textarea style={s.textarea} placeholder="Short description shown on dashboard"
               value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+
+            <label style={s.label}>Transcript (Shown in Transcript tab)</label>
+            <textarea style={s.textarea} placeholder="Full lecture transcript / notes..."
+              value={form.transcript} onChange={(e) => setForm({ ...form, transcript: e.target.value })} />
+
             <label style={s.label}>Q&amp;A / Calendly Link</label>
             <input style={s.input} type="url" placeholder="https://calendly.com/..."
               value={form.qaLink} onChange={(e) => setForm({ ...form, qaLink: e.target.value })} />
@@ -876,11 +884,6 @@ function WeeksTab() {
               </table>
             )}
       </div>
-    </div >
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

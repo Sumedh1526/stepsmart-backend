@@ -665,7 +665,7 @@ const s = {
   statFoot: { color: 'var(--muted-foreground)', fontSize: '0.88rem' },
   progressRail: {
     width: '100%',
-    height: '8px',
+    height: '4px',
     background: 'var(--muted)',
     borderRadius: '999px',
     overflow: 'hidden',
@@ -1043,22 +1043,22 @@ const s = {
     fontWeight: 800,
   },
   weekGroupBody: {
-    padding: '0 1.25rem 1.25rem',
+    padding: '0.5rem 1.25rem 1.25rem',
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.8rem',
+    gap: '0.3rem',
   },
   lessonCard: {
     display: 'grid',
-    gridTemplateColumns: '78px minmax(0, 1fr) auto',
-    gap: '0.95rem',
+    gridTemplateColumns: '24px minmax(0, 1fr) auto',
+    gap: '1rem',
     alignItems: 'center',
     textDecoration: 'none',
     color: 'inherit',
-    padding: '1rem',
-    borderRadius: '18px',
-    background: 'var(--background)',
-    border: '1px solid rgba(15, 40, 80, 0.06)',
+    padding: '0.75rem 0.75rem',
+    borderRadius: '12px',
+    background: 'transparent',
+    border: 'none',
   },
   lessonNumber: {
     width: '78px',
@@ -1465,6 +1465,101 @@ function buildCalendarGridDays(monthDate) {
   return Array.from({ length: 42 }, (_, index) => addDaysToDate(gridStart, index));
 }
 
+function LessonStatusBadge({ status, percent }) {
+  if (status === 'complete') {
+    return (
+      <span
+        style={{
+          ...s.badge,
+          background: 'var(--success-light)',
+          color: 'var(--success-fg)',
+          border: '1px solid rgba(25, 135, 84, 0.12)',
+        }}
+      >
+        Complete
+      </span>
+    );
+  }
+  if (status === 'quiz-ready') {
+    return (
+      <span
+        style={{
+          ...s.badge,
+          background: 'hsl(38, 92%, 94%)',
+          color: 'hsl(32, 81%, 29%)',
+          border: '1px solid rgba(220, 150, 30, 0.12)',
+        }}
+      >
+        Take Quiz
+      </span>
+    );
+  }
+  if (status === 'in-progress' || percent > 0) {
+    return (
+      <span
+        style={{
+          ...s.badge,
+          background: 'var(--accent)',
+          color: 'var(--accent-foreground)',
+          border: '1px solid rgba(0, 111, 143, 0.12)',
+        }}
+      >
+        {percent}% complete
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        ...s.badge,
+        background: 'var(--muted)',
+        color: 'var(--muted-foreground)',
+        border: '1px solid rgba(15, 40, 80, 0.05)',
+      }}
+    >
+      Not Started
+    </span>
+  );
+}
+
+function LessonIcon({ status }) {
+  if (status === 'complete') {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+        <circle cx="12" cy="12" r="10" stroke="var(--success)" strokeWidth="2" fill="var(--success-light)" />
+        <path
+          d="M9 12L11 14L15 10"
+          stroke="var(--success)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  if (status === 'in-progress' || status === 'quiz-ready') {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+        <circle cx="12" cy="12" r="10" stroke="var(--primary)" strokeWidth="2" fill="transparent" />
+        <path d="M10 8.5L16 12L10 15.5V8.5Z" fill="var(--primary)" />
+      </svg>
+    );
+  }
+  // Not started
+  return (
+    <div
+      style={{
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        border: '2px solid rgba(15, 40, 80, 0.25)',
+        background: 'transparent',
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 function StatusBadge({ status }) {
   const { label, bg, color } = BADGE[status] || BADGE['not-started'];
   return <span style={{ ...s.badge, background: bg, color }}>{label}</span>;
@@ -1703,31 +1798,42 @@ function FocusItem({ item }) {
 }
 
 function RecordedSessionCard({ session, isCompact }) {
+  const isPlayable = !!session.url;
+
   const content = (
     <>
-      <div style={s.lessonNumber}>{session.displaySessionNumber}</div>
+      <LessonIcon status={isPlayable ? 'in-progress' : 'not-started'} />
 
       <div style={s.lessonInfo}>
-        <div style={s.lessonTitle}>{session.title || `${session.sourceTitle} Recording`}</div>
+        <div style={s.lessonTitle}>
+          {session.displaySessionNumber} {session.title || `${session.sourceTitle} Recording`}
+        </div>
         <div style={s.lessonDesc}>
           {session.description || `Recorded session for ${session.sourceTitle}`}
         </div>
       </div>
 
-      <div style={{ justifySelf: isCompact ? 'start' : 'end' }}>
-        <span style={{ ...s.badge, background: 'var(--accent)', color: 'var(--accent-foreground)' }}>
-          {session.url ? 'Watch Video' : 'Coming Soon'}
+      <div style={{ justifySelf: 'end' }}>
+        <span
+          style={{
+            ...s.badge,
+            background: isPlayable ? 'var(--accent)' : 'var(--muted)',
+            color: isPlayable ? 'var(--accent-foreground)' : 'var(--muted-foreground)',
+            border: isPlayable ? '1px solid rgba(0, 111, 143, 0.12)' : '1px solid rgba(15, 40, 80, 0.05)',
+          }}
+        >
+          {isPlayable ? 'Watch Video' : 'Coming Soon'}
         </span>
       </div>
     </>
   );
 
-  if (!session.url) {
+  if (!isPlayable) {
     return (
       <div
         style={{
           ...s.lessonCard,
-          gridTemplateColumns: isCompact ? '1fr' : s.lessonCard.gridTemplateColumns,
+          gridTemplateColumns: isCompact ? '24px 1fr auto' : s.lessonCard.gridTemplateColumns,
         }}
       >
         {content}
@@ -1738,9 +1844,10 @@ function RecordedSessionCard({ session, isCompact }) {
   return (
     <Link
       to={`/learn/${session.courseId}/${session.id}`}
+      className="lesson-row-hover"
       style={{
         ...s.lessonCard,
-        gridTemplateColumns: isCompact ? '1fr' : s.lessonCard.gridTemplateColumns,
+        gridTemplateColumns: isCompact ? '24px 1fr auto' : s.lessonCard.gridTemplateColumns,
       }}
     >
       {content}
@@ -2287,26 +2394,21 @@ export default function DashboardPage() {
                             <Link
                               key={lesson.weekId}
                               to={`/learn/${lesson.courseId}/${lesson.weekId}`}
+                              className="lesson-row-hover"
                               style={{
                                 ...s.lessonCard,
-                                gridTemplateColumns: isCompact ? '1fr' : s.lessonCard.gridTemplateColumns,
+                                gridTemplateColumns: isCompact ? '24px 1fr auto' : s.lessonCard.gridTemplateColumns,
                               }}
                             >
-                              <div style={s.lessonNumber}>{lesson.displayWeekNumber}</div>
+                              <LessonIcon status={status} />
 
                               <div style={s.lessonInfo}>
-                                <div style={s.lessonTitle}>{lesson.title}</div>
+                                <div style={s.lessonTitle}>{lesson.displayWeekNumber} {lesson.title}</div>
                                 <div style={s.lessonDesc}>{lesson.description}</div>
-                                <div style={s.lessonProgressRow}>
-                                  <div style={{ flex: 1 }}>
-                                    <ProgressTrack percent={percent} color={progressColor} compact />
-                                  </div>
-                                  <span style={s.lessonProgressValue}>{percent}%</span>
-                                </div>
                               </div>
 
-                              <div style={{ justifySelf: isCompact ? 'start' : 'end' }}>
-                                <StatusBadge status={status} />
+                              <div style={{ justifySelf: 'end' }}>
+                                <LessonStatusBadge status={status} percent={percent} />
                               </div>
                             </Link>
                           );

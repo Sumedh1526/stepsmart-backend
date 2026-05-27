@@ -31,8 +31,8 @@ api.interceptors.request.use(async (config) => {
 
 // Sent every 10 seconds while a video is playing.
 // currentTime and duration are integers (seconds).
-export const sendHeartbeat = (courseId, weekId, currentTime, duration) =>
-  api.post('/progress/heartbeat', { courseId, weekId, currentTime, duration });
+export const sendHeartbeat = (courseId, weekId, currentTime, duration, prevTime) =>
+  api.post('/progress/heartbeat', { courseId, weekId, currentTime, duration, prevTime });
 
 // Returns all watched-segment data for a student in one course.
 // Pass { includeLeaderboard: true } when the dashboard also needs ranking data.
@@ -107,5 +107,13 @@ export const uploadAssignment = (
   }, {
     transformResponse: [data => { try { return JSON.parse(data); } catch { return {}; } }],
   });
+
+// ─── Q&A ──────────────────────────────────────────────────────────────────────
+
+export const getQAQuestions = (courseId, weekId) =>
+  api.get(`/courses/${courseId}/weeks/${weekId}/qa`);
+
+export const postQAQuestion = (courseId, weekId, text) =>
+  api.post(`/courses/${courseId}/weeks/${weekId}/qa`, { text });
 
 export default api;
