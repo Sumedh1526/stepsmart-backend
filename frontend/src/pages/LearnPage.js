@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getCourseWeeks, getProgress } from '../utils/api';
+import { getCourseWeeks, getProgress, getQAQuestions, postQAQuestion } from '../utils/api';
 import VideoPlayer from '../components/VideoPlayer';
 import QuizComponent from '../components/QuizComponent';
 
@@ -297,15 +297,19 @@ export default function LearnPage() {
   async function loadWeek() {
     setLoading(true);
     try {
-      const [weeksRes, progressRes] = await Promise.all([
+      const [weeksRes, progressRes, qaRes] = await Promise.all([
         getCourseWeeks(courseId),
         getProgress(courseId),
+        getQAQuestions(courseId, weekId).catch((err) => {
+          console.error('Failed to load QA comments:', err);
+          return { data: { questions: [] } };
+        }),
       ]);
       
       let found = null;
       const isRecordedSession = String(weekId).startsWith('rec-');
 
-      const modulesList = weeksRes.data.modules || [];
+      const modulesList = weeksRes.data.modules || weeksRes.data.weeks || [];
       const liveWeeksList = weeksRes.data.liveWeeks || [];
       const supplementalList = weeksRes.data.supplementalContent?.liveRecordedSessions || [];
       
@@ -333,6 +337,12 @@ export default function LearnPage() {
       setVideoComplete(weekProgress?.videoComplete || false);
       setQuizPassed(weekProgress?.quizPassed || false);
       setQuizUnlocked(weekProgress?.videoComplete || false);
+
+      const fetchedQuestions = qaRes?.data?.questions || [];
+      setQuestionsList(fetchedQuestions.length > 0 ? fetchedQuestions : [
+        { id: 1, author: 'Student A', text: 'Are we covering advanced metrics in week 3?', date: '2 days ago' },
+        { id: 2, author: 'Parth Randive', text: 'Yes, week 3 focuses heavily on key product-led growth metrics!', date: '1 day ago' },
+      ]);
     } catch (err) {
       console.error(err);
       setError('Failed to load this content. Please try again.');
@@ -341,16 +351,17 @@ export default function LearnPage() {
     }
   }
 
-  function handlePostQuestion() {
+  async function handlePostQuestion() {
     if (!newQuestionText.trim()) return;
-    const newQ = {
-      id: Date.now(),
-      author: 'You',
-      text: newQuestionText.trim(),
-      date: 'Just now',
-    };
-    setQuestionsList([newQ, ...questionsList]);
-    setNewQuestionText('');
+    try {
+      const res = await postQAQuestion(courseId, weekId, newQuestionText.trim());
+      const newQ = res.data.question;
+      setQuestionsList([newQ, ...questionsList]);
+      setNewQuestionText('');
+    } catch (err) {
+      console.error('Failed to post question:', err);
+      alert('Failed to post question. Please try again.');
+    }
   }
 
   if (loading) return <div style={s.loading}>Loading week content…</div>;

@@ -9,6 +9,7 @@ import {
   adminDeleteWeek,
   adminGetAllProgress,
   adminGetAllSubmissions,
+  adminUpdateSupplementalContent,
 } from '../utils/api';
 
 const COURSE_ID = 'course-001';
@@ -883,11 +884,6 @@ function WeeksTab() {
               </table>
             )}
       </div>
-    </div >
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

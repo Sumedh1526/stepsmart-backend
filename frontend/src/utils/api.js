@@ -108,4 +108,12 @@ export const uploadAssignment = (
     transformResponse: [data => { try { return JSON.parse(data); } catch { return {}; } }],
   });
 
+// ─── Q&A ──────────────────────────────────────────────────────────────────────
+
+export const getQAQuestions = (courseId, weekId) =>
+  api.get(`/courses/${courseId}/weeks/${weekId}/qa`);
+
+export const postQAQuestion = (courseId, weekId, text) =>
+  api.post(`/courses/${courseId}/weeks/${weekId}/qa`, { text });
+
 export default api;

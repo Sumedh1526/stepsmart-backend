@@ -583,6 +583,104 @@ async function submitQuizAttempt(userId, body) {
   return res(200, { passed, score: correct, total, pct, correctAnswers });
 }
 
+async function getQAQuestions(courseId, weekId) {
+  if (!courseId || !weekId) {
+    return res(400, { message: 'Missing courseId or weekId' });
+  }
+
+  try {
+    const result = await ddb.send(new QueryCommand({
+      TableName: COURSES_TABLE,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
+      ExpressionAttributeValues: {
+        ':pk': `COURSE#${courseId}`,
+        ':prefix': `QA#${weekId}#`,
+      },
+    }));
+
+    const questions = (result.Items || []).map((item) => ({
+      id: item.id,
+      author: item.author,
+      text: item.text,
+      date: item.date || 'Just now',
+      createdAt: item.createdAt,
+    })).sort((a, b) => b.id - a.id); // Latest first
+
+    return res(200, { questions });
+  } catch (err) {
+    console.error('getQAQuestions error:', err);
+    return res(500, { message: 'Failed to fetch questions' });
+  }
+}
+
+async function postQAQuestion(courseId, weekId, userId, body, event) {
+  if (!courseId || !weekId) {
+    return res(400, { message: 'Missing courseId or weekId' });
+  }
+  if (!body.text || !body.text.trim()) {
+    return res(400, { message: 'Question text is required' });
+  }
+
+  const claimsName = event.requestContext?.authorizer?.claims?.name;
+  const claimsEmail = event.requestContext?.authorizer?.claims?.email;
+  const authorName = claimsName || claimsEmail || `Student ${String(userId || '').slice(-6) || 'Unknown'}`;
+
+  const questionId = Date.now();
+  const nowStr = new Date().toISOString();
+  const dateStr = 'Just now';
+
+  const item = {
+    pk: `COURSE#${courseId}`,
+    sk: `QA#${weekId}#${questionId}`,
+    id: questionId,
+    courseId,
+    weekId,
+    userId,
+    author: authorName,
+    text: body.text.trim(),
+    date: dateStr,
+    createdAt: nowStr,
+    type: 'qa',
+  };
+
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: COURSES_TABLE,
+      Key: { pk: item.pk, sk: item.sk },
+      UpdateExpression: 'SET id = :id, courseId = :courseId, weekId = :weekId, userId = :userId, author = :author, #txt = :text, #dt = :date, createdAt = :createdAt, #tp = :type',
+      ExpressionAttributeNames: {
+        '#txt': 'text',
+        '#dt': 'date',
+        '#tp': 'type',
+      },
+      ExpressionAttributeValues: {
+        ':id': item.id,
+        ':courseId': item.courseId,
+        ':weekId': item.weekId,
+        ':userId': item.userId,
+        ':author': item.author,
+        ':text': item.text,
+        ':date': item.date,
+        ':createdAt': item.createdAt,
+        ':type': item.type,
+      },
+    }));
+
+    return res(200, {
+      question: {
+        id: item.id,
+        author: item.author,
+        text: item.text,
+        date: item.date,
+        createdAt: item.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error('postQAQuestion error:', err);
+    return res(500, { message: 'Failed to post question' });
+  }
+}
+
 exports.handler = async (event) => {
   currentOrigin = event?.headers?.origin || event?.headers?.Origin || FRONTEND_URL;
   if (event.httpMethod === 'OPTIONS') return res(200, {});
@@ -605,6 +703,8 @@ exports.handler = async (event) => {
   try {
     if (method === 'GET' && resource === '/courses/my') return await listMyCourses();
     if (method === 'GET' && resource === '/courses/{courseId}/weeks') return await listCourseWeeks(courseId, event);
+    if (method === 'GET' && resource === '/courses/{courseId}/weeks/{weekId}/qa') return await getQAQuestions(courseId, params.weekId);
+    if (method === 'POST' && resource === '/courses/{courseId}/weeks/{weekId}/qa') return await postQAQuestion(courseId, params.weekId, userId, body, event);
     if (method === 'GET' && resource === '/progress/{courseId}') return await getProgressForCourse(courseId, userId, event);
     if (method === 'POST' && resource === '/progress/heartbeat') return await recordHeartbeat(userId, body);
     if (method === 'POST' && resource === '/quiz/submit') return await submitQuizAttempt(userId, body);

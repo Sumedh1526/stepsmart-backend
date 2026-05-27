@@ -79,3 +79,12 @@ body {
 }
 .btn-primary:hover { background: var(--primary-dark); box-shadow: var(--shadow-sm); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Sleek hover state for dashboard lesson list items */
+.lesson-row-hover {
+  transition: background-color 0.2s ease;
+}
+.lesson-row-hover:hover {
+  background-color: rgba(0, 111, 143, 0.04) !important;
+}
+
