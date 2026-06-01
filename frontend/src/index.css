@@ -95,7 +95,7 @@ body {
 .cohort-card-hover:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 30px rgba(15, 40, 80, 0.1) !important;
-  border-color: rgba(25, 135, 84, 0.2) !important;
+  border-color: var(--primary) !important;
 }
 
 

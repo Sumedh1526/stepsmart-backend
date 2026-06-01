@@ -2726,7 +2726,7 @@ export default function DashboardPage() {
                 width: '46px',
                 height: '24px',
                 borderRadius: '999px',
-                background: emailNotifications ? '#198754' : '#e4e4e7',
+                background: emailNotifications ? 'var(--primary)' : '#e4e4e7',
                 position: 'relative',
                 cursor: 'pointer',
                 transition: 'background 0.2s',
@@ -2761,7 +2761,7 @@ export default function DashboardPage() {
                 width: '46px',
                 height: '24px',
                 borderRadius: '999px',
-                background: whatsappNotifications ? '#198754' : '#e4e4e7',
+                background: whatsappNotifications ? 'var(--primary)' : '#e4e4e7',
                 position: 'relative',
                 cursor: 'pointer',
                 transition: 'background 0.2s',
@@ -2797,7 +2797,7 @@ export default function DashboardPage() {
           </div>
 
           <div style={{ ...s.settingsActions, marginTop: '1.25rem' }}>
-            <button type="submit" style={{ ...s.primaryAction, background: '#198754', marginTop: 0 }} disabled={savingDisplayName}>
+            <button type="submit" style={{ ...s.primaryAction, background: 'var(--primary)', marginTop: 0 }} disabled={savingDisplayName}>
               {savingDisplayName ? 'Saving…' : 'Save'}
             </button>
             <button type="button" style={s.mutedAction} onClick={handleSignOut}>
@@ -2834,7 +2834,11 @@ export default function DashboardPage() {
               ? linkedinUrlInput
               : student.linkedinUrl;
             
-            const linkedinUrl = savedLinkedin || `https://www.linkedin.com/in/${student.displayName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            const rawLinkedinUrl = savedLinkedin || `https://www.linkedin.com/in/${student.displayName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            let linkedinUrl = rawLinkedinUrl.trim();
+            if (linkedinUrl && !/^https?:\/\//i.test(linkedinUrl)) {
+              linkedinUrl = `https://${linkedinUrl}`;
+            }
 
             return (
               <div
@@ -2861,8 +2865,8 @@ export default function DashboardPage() {
                     width: '54px',
                     height: '54px',
                     borderRadius: '50%',
-                    background: 'rgba(25, 135, 84, 0.08)',
-                    color: '#198754',
+                    background: 'rgba(0, 111, 143, 0.08)',
+                    color: 'var(--primary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -3015,7 +3019,7 @@ export default function DashboardPage() {
                   gap: '0.5rem',
                   padding: '0.6rem 1.15rem',
                   borderRadius: '10px',
-                  background: '#198754',
+                  background: 'var(--primary)',
                   color: '#fff',
                   fontSize: '0.875rem',
                   fontWeight: 600,

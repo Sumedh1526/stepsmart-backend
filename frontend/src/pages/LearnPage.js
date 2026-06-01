@@ -6,6 +6,100 @@ import QuizComponent from '../components/QuizComponent';
 
 const s = {
   page: { minHeight: '100vh', background: 'var(--background)' },
+  shell: {
+    minHeight: '100vh',
+    display: 'grid',
+    gap: '0',
+  },
+  sidebar: {
+    background: 'linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%)',
+    color: '#fff',
+    padding: '1.5rem 1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 18px 42px rgba(15, 40, 80, 0.18)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  sidebarGlow: {
+    position: 'absolute',
+    inset: '-10% auto auto -20%',
+    width: '220px',
+    height: '220px',
+    background: 'radial-gradient(circle, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 68%)',
+    pointerEvents: 'none',
+  },
+  brand: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    fontSize: '1.125rem',
+    fontWeight: 700,
+    letterSpacing: '-0.03em',
+    marginBottom: '2rem',
+    color: '#fff',
+    textDecoration: 'none',
+  },
+  brandMark: {
+    width: '34px',
+    height: '34px',
+    borderRadius: '12px',
+    background: 'rgba(255,255,255,0.16)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '1.1rem',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+  },
+  navStack: {
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.45rem',
+    marginBottom: '1.25rem',
+  },
+  navButton: {
+    position: 'relative',
+    border: 'none',
+    textAlign: 'left',
+    borderRadius: '14px',
+    padding: '0.84rem 1rem',
+    fontSize: '0.875rem',
+    fontWeight: 500,
+    color: 'rgba(255,255,255,0.78)',
+    background: 'transparent',
+    cursor: 'pointer',
+    transition: 'background 0.2s, color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.8rem',
+    textDecoration: 'none',
+  },
+  navButtonActive: {
+    background: 'rgba(255,255,255,0.15)',
+    color: '#fff',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+  },
+  navButtonIcon: {
+    width: '24px',
+    height: '24px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'currentColor',
+    opacity: 0.95,
+    flexShrink: 0,
+  },
+  navActiveRail: {
+    position: 'absolute',
+    left: '-1rem',
+    top: '10px',
+    bottom: '10px',
+    width: '4px',
+    borderRadius: '0 6px 6px 0',
+    background: '#fff',
+  },
 
   // ── Nav ──────────────────────────────────────────────────────────────────
   nav: {
@@ -270,7 +364,77 @@ function ProgressStep({ label, done, active, locked }) {
     </div>
   );
 }
+const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Home', icon: 'home' },
+  { id: 'courses', label: 'Courses', icon: 'book' },
+  { id: 'cohort', label: 'Cohort', icon: 'users' },
+  { id: 'scheduling', label: 'Sessions', icon: 'clock' },
+  { id: 'assignments', label: 'Assignments', icon: 'clipboard' },
+  { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+  { id: 'settings', label: 'Profile', icon: 'settings' },
+];
 
+function SidebarIcon({ kind }) {
+  const common = { width: 21, height: 21, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+
+  if (kind === 'home') {
+    return (
+      <svg {...common}>
+        <path d="M3 10.5 12 3l9 7.5" />
+        <path d="M5.5 9.5V21h13V9.5" />
+        <path d="M9.5 21v-6h5v6" />
+      </svg>
+    );
+  }
+  if (kind === 'book') {
+    return (
+      <svg {...common}>
+        <path d="M3 5.5c0-1.1.9-2 2-2h6v16H5a2 2 0 0 0-2 2z" />
+        <path d="M21 5.5c0-1.1-.9-2-2-2h-6v16h6a2 2 0 0 1 2 2z" />
+      </svg>
+    );
+  }
+  if (kind === 'clock') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    );
+  }
+  if (kind === 'clipboard') {
+    return (
+      <svg {...common}>
+        <rect x="5" y="4" width="14" height="17" rx="2" />
+        <path d="M9 4.5h6v3H9z" />
+      </svg>
+    );
+  }
+  if (kind === 'calendar') {
+    return (
+      <svg {...common}>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M3 10h18" />
+      </svg>
+    );
+  }
+  if (kind === 'users') {
+    return (
+      <svg {...common}>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1 1 0 0 1 0 1.4l-1.1 1.1a1 1 0 0 1-1.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a1 1 0 0 1-1 1h-1.6a1 1 0 0 1-1-1v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1 1 0 0 1-1.4 0L4.2 18a1 1 0 0 1 0-1.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H3.4a1 1 0 0 1-1-1v-1.6a1 1 0 0 1 1-1h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1 1 0 0 1 0-1.4l1.1-1.1a1 1 0 0 1 1.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V4a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1 1 0 0 1 1.4 0l1.1 1.1a1 1 0 0 1 0 1.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2a1 1 0 0 1 1 1v1.6a1 1 0 0 1-1 1h-.2a1 1 0 0 0-.9.6z" />
+    </svg>
+  );
+}
 export default function LearnPage() {
   const { courseId, weekId } = useParams();
 
@@ -283,6 +447,18 @@ export default function LearnPage() {
   const [quizPassed, setQuizPassed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isCompact, setIsCompact] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 980 : false,
+  );
+
+  useEffect(() => {
+    function handleResize() {
+      setIsCompact(window.innerWidth < 980);
+    }
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Tabs and Questions state
   const [activeTab, setActiveTab] = useState('progress');
@@ -378,204 +554,253 @@ export default function LearnPage() {
   const currentIdx = allWeeks.findIndex((w) => (w.weekId || w.id) === weekId);
   const nextWeek = currentIdx !== -1 && currentIdx < allWeeks.length - 1 ? allWeeks[currentIdx + 1] : null;
 
+  const shellStyle = {
+    ...s.shell,
+    gridTemplateColumns: isCompact ? '1fr' : '250px minmax(0, 1fr)',
+  };
+
+  const sidebarStyle = {
+    ...s.sidebar,
+    minHeight: isCompact ? 'auto' : '100vh',
+    height: isCompact ? 'auto' : '100vh',
+    maxHeight: isCompact ? 'none' : '100vh',
+    position: isCompact ? 'relative' : 'sticky',
+    top: 0,
+    alignSelf: isCompact ? 'stretch' : 'start',
+    overflowX: 'hidden',
+    overflowY: isCompact ? 'visible' : 'auto',
+  };
+
   return (
     <div style={s.page}>
-      {/* Nav */}
-      <nav style={s.nav}>
-        <Link to="/dashboard?view=courses" style={s.backLink}>← My Courses</Link>
-        <span style={s.navBrand}>StepSmart</span>
-        {isRecordedSession ? (
-          <span style={s.weekBadge}>Recorded Session</span>
-        ) : (
-          <span style={s.weekBadge}>Week {displayWeekNumber || week.weekNumber}</span>
-        )}
-      </nav>
+      <div style={shellStyle}>
+        <aside style={sidebarStyle}>
+          <div style={s.sidebarGlow} />
 
-      <div style={s.layout}>
-        {/* Main Content Area */}
-        <div style={s.main}>
-          <div style={s.weekTitle}>{week.title}</div>
-          <div style={s.weekDesc}>{week.description}</div>
+          <Link to="/dashboard" style={s.brand}>
+            <div style={s.brandMark}>S</div>
+            <span>StepSmart</span>
+          </Link>
 
-          {videoId || videoUrl ? (
-            <VideoPlayer
-              videoId={videoId}
-              videoUrl={videoUrl}
-              courseId={courseId}
-              weekId={weekId}
-              initialProgress={progress}
-              onVideoComplete={() => setVideoComplete(true)}
-              onQuizUnlock={() => setQuizUnlocked(true)}
-            />
-          ) : (
-            <div style={s.noVideo}>No video has been attached yet.</div>
-          )}
-
-          {videoComplete && week.qaLink && (
-            <div style={s.qaSection}>
-              <a href={week.qaLink} target="_blank" rel="noopener noreferrer" style={s.qaLink}>
-                Book your Q&amp;A session →
-              </a>
-            </div>
-          )}
-
-          {/* Pill Tabs Bar */}
-          <div style={s.tabBar}>
-            <button
-              onClick={() => setActiveTab('progress')}
-              style={{ ...s.tabBtn, ...(activeTab === 'progress' ? s.tabBtnActive : {}) }}
-            >
-              Your Progress
-            </button>
-            <button
-              onClick={() => setActiveTab('transcript')}
-              style={{ ...s.tabBtn, ...(activeTab === 'transcript' ? s.tabBtnActive : {}) }}
-            >
-              Transcript
-            </button>
-            <button
-              onClick={() => setActiveTab('resources')}
-              style={{ ...s.tabBtn, ...(activeTab === 'resources' ? s.tabBtnActive : {}) }}
-            >
-              Resources
-            </button>
+          <div style={s.navStack}>
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.id}
+                to={`/dashboard?view=${item.id}`}
+                style={{
+                  ...s.navButton,
+                  ...(item.id === 'courses' ? s.navButtonActive : {}),
+                }}
+              >
+                {item.id === 'courses' && <span style={s.navActiveRail} />}
+                <span style={s.navButtonIcon}>
+                  <SidebarIcon kind={item.icon} />
+                </span>
+                {item.label}
+              </Link>
+            ))}
           </div>
+        </aside>
 
-          {/* Tab Contents */}
-          {activeTab === 'progress' && (
-            <div style={s.tabContentCard}>
-              <div style={s.sidebarHeading}>Your progress</div>
-              <ProgressStep label="Watch video" done={videoComplete} active={!videoComplete} />
-              {hasQuiz ? (
-                <ProgressStep label="Pass quiz" done={quizPassed} active={quizUnlocked && !quizPassed} locked={!quizUnlocked} />
+        <div>
+          {/* Nav */}
+          <nav style={s.nav}>
+            <Link to="/dashboard?view=courses" style={s.backLink}>← My Courses</Link>
+            <span style={s.navBrand}>StepSmart</span>
+            {isRecordedSession ? (
+              <span style={s.weekBadge}>Recorded Session</span>
+            ) : (
+              <span style={s.weekBadge}>Week {displayWeekNumber || week.weekNumber}</span>
+            )}
+          </nav>
+
+          <div style={s.layout}>
+            {/* Main Content Area */}
+            <div style={s.main}>
+              <div style={s.weekTitle}>{week.title}</div>
+              <div style={s.weekDesc}>{week.description}</div>
+
+              {videoId || videoUrl ? (
+                <VideoPlayer
+                  videoId={videoId}
+                  videoUrl={videoUrl}
+                  courseId={courseId}
+                  weekId={weekId}
+                  initialProgress={progress}
+                  onVideoComplete={() => setVideoComplete(true)}
+                  onQuizUnlock={() => setQuizUnlocked(true)}
+                />
               ) : (
-                <ProgressStep label="Quiz not required" done={videoComplete} locked={!videoComplete} />
+                <div style={s.noVideo}>No video has been attached yet.</div>
               )}
-              <ProgressStep label="Week complete" done={weekComplete} locked={!weekComplete} />
-            </div>
-          )}
 
-          {activeTab === 'transcript' && (
-            <div style={s.tabContentCard}>
-              {week.transcript ? (
-                <div style={{ color: 'var(--foreground)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                  {week.transcript}
+              {videoComplete && week.qaLink && (
+                <div style={s.qaSection}>
+                  <a href={week.qaLink} target="_blank" rel="noopener noreferrer" style={s.qaLink}>
+                    Book your Q&amp;A session →
+                  </a>
                 </div>
-              ) : (
-                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
-                  No transcript for this lesson.
-                </p>
               )}
-            </div>
-          )}
 
-          {activeTab === 'resources' && (
-            <div style={s.tabContentCard}>
-              <div style={s.sidebarHeading}>Resources</div>
-              {week.resources && week.resources.length > 0 ? (
-                <div style={s.resourceList}>
-                  {week.resources.map((r, i) => (
-                    <a key={r.id || i} href={r.url} target="_blank" rel="noopener noreferrer" style={s.resourceLink}>
-                      <span style={{ fontSize: '1.1rem' }}>📄</span>
-                      {r.title}
+              {/* Pill Tabs Bar */}
+              <div style={s.tabBar}>
+                <button
+                  onClick={() => setActiveTab('progress')}
+                  style={{ ...s.tabBtn, ...(activeTab === 'progress' ? s.tabBtnActive : {}) }}
+                >
+                  Your Progress
+                </button>
+                <button
+                  onClick={() => setActiveTab('transcript')}
+                  style={{ ...s.tabBtn, ...(activeTab === 'transcript' ? s.tabBtnActive : {}) }}
+                >
+                  Transcript
+                </button>
+                <button
+                  onClick={() => setActiveTab('resources')}
+                  style={{ ...s.tabBtn, ...(activeTab === 'resources' ? s.tabBtnActive : {}) }}
+                >
+                  Resources
+                </button>
+              </div>
+
+              {/* Tab Contents */}
+              {activeTab === 'progress' && (
+                <div style={s.tabContentCard}>
+                  <div style={s.sidebarHeading}>Your progress</div>
+                  <ProgressStep label="Watch video" done={videoComplete} active={!videoComplete} />
+                  {hasQuiz ? (
+                    <ProgressStep label="Pass quiz" done={quizPassed} active={quizUnlocked && !quizPassed} locked={!quizUnlocked} />
+                  ) : (
+                    <ProgressStep label="Quiz not required" done={videoComplete} locked={!videoComplete} />
+                  )}
+                  <ProgressStep label="Week complete" done={weekComplete} locked={!weekComplete} />
+                </div>
+              )}
+
+              {activeTab === 'transcript' && (
+                <div style={s.tabContentCard}>
+                  {week.transcript ? (
+                    <div style={{ color: 'var(--foreground)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {week.transcript}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
+                      No transcript for this lesson.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'resources' && (
+                <div style={s.tabContentCard}>
+                  <div style={s.sidebarHeading}>Resources</div>
+                  {week.resources && week.resources.length > 0 ? (
+                    <div style={s.resourceList}>
+                      {week.resources.map((r, i) => (
+                        <a key={r.id || i} href={r.url} target="_blank" rel="noopener noreferrer" style={s.resourceLink}>
+                          <span style={{ fontSize: '1.1rem' }}>📄</span>
+                          {r.title}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
+                      No resources for this lesson.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Quiz Card */}
+              <div style={s.tabContentCard}>
+                <div style={{ ...s.sidebarHeading, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>{quizPassed ? '✓' : !quizUnlocked ? '🔒' : '📝'}</span>
+                  <span>Quiz</span>
+                </div>
+                {!hasQuiz ? (
+                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
+                    No quiz for this week. This week is complete after finishing the video.
+                  </p>
+                ) : !quizUnlocked ? (
+                  <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
+                    Watch at least 80% of the video to unlock the quiz.
+                  </p>
+                ) : (
+                  <QuizComponent
+                    courseId={courseId}
+                    weekId={weekId}
+                    questions={week.quiz?.questions || []}
+                    initialPassed={quizPassed}
+                    onQuizPassed={() => setQuizPassed(true)}
+                  />
+                )}
+              </div>
+
+              {/* Reference Documents */}
+              {week.docs && week.docs.length > 0 && (
+                <div style={s.tabContentCard}>
+                  <div style={s.sidebarHeading}>Reference Documents</div>
+                  {week.docs.map((doc) => (
+                    <a
+                      key={doc.id}
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={s.docLink}
+                    >
+                      <span style={{ fontSize: '0.9rem' }}>📄</span>
+                      {doc.label}
                     </a>
                   ))}
                 </div>
-              ) : (
-                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
-                  No resources for this lesson.
-                </p>
               )}
-            </div>
-          )}
 
-          {/* Quiz Card */}
-          <div style={s.tabContentCard}>
-            <div style={{ ...s.sidebarHeading, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span>{quizPassed ? '✓' : !quizUnlocked ? '🔒' : '📝'}</span>
-              <span>Quiz</span>
-            </div>
-            {!hasQuiz ? (
-              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
-                No quiz for this week. This week is complete after finishing the video.
-              </p>
-            ) : !quizUnlocked ? (
-              <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', lineHeight: 1.5, margin: 0 }}>
-                Watch at least 80% of the video to unlock the quiz.
-              </p>
-            ) : (
-              <QuizComponent
-                courseId={courseId}
-                weekId={weekId}
-                questions={week.quiz?.questions || []}
-                initialPassed={quizPassed}
-                onQuizPassed={() => setQuizPassed(true)}
-              />
-            )}
-          </div>
+              {/* Questions & Answers Card */}
+              <div style={s.qaCard}>
+                <div style={s.sidebarHeading}>Questions &amp; Answers</div>
+                <div style={s.qaInputContainer}>
+                  <input
+                    type="text"
+                    placeholder="Ask a question..."
+                    style={s.qaInput}
+                    value={newQuestionText}
+                    onChange={(e) => setNewQuestionText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handlePostQuestion()}
+                  />
+                  <button style={s.qaPostBtn} onClick={handlePostQuestion}>Post</button>
+                </div>
 
-          {/* Reference Documents */}
-          {week.docs && week.docs.length > 0 && (
-            <div style={s.tabContentCard}>
-              <div style={s.sidebarHeading}>Reference Documents</div>
-              {week.docs.map((doc) => (
-                <a
-                  key={doc.id}
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={s.docLink}
-                >
-                  <span style={{ fontSize: '0.9rem' }}>📄</span>
-                  {doc.label}
-                </a>
-              ))}
-            </div>
-          )}
+                <div style={s.commentList}>
+                  {questionsList.length > 0 ? (
+                    questionsList.map((q) => (
+                      <div key={q.id} style={s.commentItem}>
+                        <div style={s.commentHeader}>
+                          <span>{q.author}</span>
+                          <span>{q.date}</span>
+                        </div>
+                        <div style={s.commentText}>{q.text}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
+                      No questions yet.
+                    </p>
+                  )}
+                </div>
+              </div>
 
-          {/* Questions & Answers Card */}
-          <div style={s.qaCard}>
-            <div style={s.sidebarHeading}>Questions &amp; Answers</div>
-            <div style={s.qaInputContainer}>
-              <input
-                type="text"
-                placeholder="Ask a question..."
-                style={s.qaInput}
-                value={newQuestionText}
-                onChange={(e) => setNewQuestionText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handlePostQuestion()}
-              />
-              <button style={s.qaPostBtn} onClick={handlePostQuestion}>Post</button>
-            </div>
-
-            <div style={s.commentList}>
-              {questionsList.length > 0 ? (
-                questionsList.map((q) => (
-                  <div key={q.id} style={s.commentItem}>
-                    <div style={s.commentHeader}>
-                      <span>{q.author}</span>
-                      <span>{q.date}</span>
-                    </div>
-                    <div style={s.commentText}>{q.text}</div>
-                  </div>
-                ))
-              ) : (
-                <p style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', margin: 0 }}>
-                  No questions yet.
-                </p>
+              {/* Next Lesson Navigation Button */}
+              {nextWeek && (
+                <div style={s.nextBtnContainer}>
+                  <Link to={`/learn/${courseId}/${nextWeek.weekId || nextWeek.id}`} style={s.nextBtn}>
+                    Next lesson →
+                  </Link>
+                </div>
               )}
+
             </div>
           </div>
-
-          {/* Next Lesson Navigation Button */}
-          {nextWeek && (
-            <div style={s.nextBtnContainer}>
-              <Link to={`/learn/${courseId}/${nextWeek.weekId || nextWeek.id}`} style={s.nextBtn}>
-                Next lesson →
-              </Link>
-            </div>
-          )}
-
         </div>
       </div>
     </div>
