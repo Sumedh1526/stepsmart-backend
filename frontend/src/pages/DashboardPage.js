@@ -1891,10 +1891,10 @@ function RecordedSessionCard({ session, isCompact }) {
 
       <div style={s.lessonInfo}>
         <div style={s.lessonTitle}>
-          {session.displaySessionNumber} {session.title || `${session.sourceTitle} Recording`}
+          {session.displaySessionNumber} {session.title || `${session.sourceTitle} Session`}
         </div>
         <div style={s.lessonDesc}>
-          {session.description || `Recorded session for ${session.sourceTitle}`}
+          {session.description || `Live session for ${session.sourceTitle}`}
         </div>
       </div>
 
@@ -2532,10 +2532,7 @@ export default function DashboardPage() {
 
     return (
       <div style={s.card}>
-        <div style={s.panelHeader}>
-          <div>
-            <div style={s.sectionTitle}>{showingVideos ? 'Course Videos' : 'Live Recorded Sessions'}</div>
-          </div>
+        <div style={{ ...s.panelHeader, justifyContent: 'flex-start' }}>
           <div style={s.courseTabs}>
             <button
               type="button"
@@ -2555,7 +2552,7 @@ export default function DashboardPage() {
                 setExpandedGroups({});
               }}
             >
-              Live Recorded Sessions
+              Live Sessions
             </button>
           </div>
         </div>
@@ -2589,7 +2586,7 @@ export default function DashboardPage() {
                             : `Week ${group.groupNumber}`}
                         </div>
                         <div style={s.weekGroupMeta}>
-                          {groupItemCount} {showingVideos ? `video${groupItemCount === 1 ? '' : 's'}` : `recording${groupItemCount === 1 ? '' : 's'}`}
+                          {groupItemCount} {showingVideos ? `video${groupItemCount === 1 ? '' : 's'}` : `session${groupItemCount === 1 ? '' : 's'}`}
                           {showingVideos && (
                             <>
                               {' • '}
@@ -2647,7 +2644,7 @@ export default function DashboardPage() {
                           );
                         })
                       ) : group.sessions.length === 0 ? (
-                        <div style={s.empty}>No live recorded sessions have been added for this week yet.</div>
+                        <div style={s.empty}>No live sessions have been added for this week yet.</div>
                       ) : (
                         group.sessions.map((session) => (
                           <RecordedSessionCard
@@ -3086,7 +3083,7 @@ export default function DashboardPage() {
   if (activeView === 'courses') {
     viewEyebrow = 'My Courses';
     viewTitle = activeCourse?.name || 'My Courses';
-    viewSubtitle = activeCourse?.description || 'Browse your course videos and live recorded sessions grouped by week.';
+    viewSubtitle = activeCourse?.description || 'Browse your course videos and live sessions grouped by week.';
   }
 
   if (activeView === 'cohort') {
