@@ -121,8 +121,8 @@ body {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .modal-btn-primary:hover {
-  background-color: #059669 !important;
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important;
+  background-color: var(--primary-dark) !important;
+  box-shadow: 0 6px 16px rgba(0, 111, 143, 0.35) !important;
   transform: translateY(-1px);
 }
 .modal-btn-primary:active {

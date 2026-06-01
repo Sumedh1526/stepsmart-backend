@@ -238,7 +238,7 @@ const s = {
   },
   qaPostBtn: {
     padding: '0.6rem 1.25rem',
-    background: '#0F9D58', // Teal-green matching the screenshot
+    background: 'var(--primary)',
     color: '#fff',
     border: 'none',
     borderRadius: '8px',
@@ -283,7 +283,7 @@ const s = {
     alignItems: 'center',
     gap: '0.5rem',
     padding: '0.65rem 1.25rem',
-    background: '#9CD3C4', // Soft teal-green from screenshot
+    background: 'var(--primary)',
     color: '#FFFFFF',
     borderRadius: '8px',
     textDecoration: 'none',
@@ -346,7 +346,7 @@ const s = {
     width: '64px',
     height: '64px',
     borderRadius: '50%',
-    backgroundColor: 'rgba(15, 157, 88, 0.1)',
+    backgroundColor: 'rgba(0, 111, 143, 0.1)',
     marginBottom: '1.25rem',
   },
   modalTitle: {
@@ -356,7 +356,7 @@ const s = {
     margin: '0 0 1.75rem',
   },
   modalPrimaryBtn: {
-    backgroundColor: '#0F9D58',
+    backgroundColor: 'var(--primary)',
     color: '#ffffff',
     border: 'none',
     borderRadius: '12px',
@@ -365,7 +365,7 @@ const s = {
     fontWeight: 600,
     width: '100%',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(15, 157, 88, 0.25)',
+    boxShadow: '0 4px 12px rgba(0, 111, 143, 0.25)',
   },
   modalSecondaryBtn: {
     backgroundColor: '#ffffff',
@@ -519,6 +519,7 @@ export default function LearnPage() {
   const navigate = useNavigate();
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const quizRef = useRef(null);
+  const initiallyCompleteRef = useRef(false);
 
   const [week, setWeek] = useState(null);
   const [allWeeks, setAllWeeks] = useState([]);
@@ -592,7 +593,9 @@ export default function LearnPage() {
 
       const weekProgress = (progressRes.data.progress || []).find((p) => p.weekId === weekId) || null;
       setProgress(weekProgress);
-      setVideoComplete(weekProgress?.videoComplete || false);
+      const wasAlreadyComplete = weekProgress?.videoComplete || false;
+      initiallyCompleteRef.current = wasAlreadyComplete;
+      setVideoComplete(wasAlreadyComplete);
       setQuizPassed(weekProgress?.quizPassed || false);
       setQuizUnlocked(weekProgress?.videoComplete || false);
 
@@ -698,11 +701,13 @@ export default function LearnPage() {
                   courseId={courseId}
                   weekId={weekId}
                   initialProgress={progress}
-                  onVideoComplete={() => {
-                    setVideoComplete(true);
-                    setShowCompletionModal(true);
-                  }}
+                  onVideoComplete={() => setVideoComplete(true)}
                   onQuizUnlock={() => setQuizUnlocked(true)}
+                  onVideoEnded={() => {
+                    if (!initiallyCompleteRef.current) {
+                      setShowCompletionModal(true);
+                    }
+                  }}
                 />
               ) : (
                 <div style={s.noVideo}>No video has been attached yet.</div>
@@ -883,8 +888,8 @@ export default function LearnPage() {
           <div style={s.modalCard} className="modal-card-animate">
             <div style={s.modalIconContainer}>
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="#0F9D58" strokeWidth="2.5" fill="none" />
-                <path d="M8 12L11 15L16 9" stroke="#0F9D58" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="10" stroke="var(--primary)" strokeWidth="2.5" fill="none" />
+                <path d="M8 12L11 15L16 9" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
             

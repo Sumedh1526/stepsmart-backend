@@ -130,7 +130,7 @@ const s = {
   },
 };
 
-export default function VideoPlayer({ videoId, videoUrl, courseId, weekId, initialProgress, onVideoComplete, onQuizUnlock }) {
+export default function VideoPlayer({ videoId, videoUrl, courseId, weekId, initialProgress, onVideoComplete, onQuizUnlock, onVideoEnded }) {
   const isHtml5 = !!videoUrl;
   const nativeVideoRef = useRef(null);
   const playerRef = useRef(null);
@@ -260,6 +260,7 @@ export default function VideoPlayer({ videoId, videoUrl, courseId, weekId, initi
       fireHeartbeatRef.current();
       stopHeartbeat();
       stopUiTimer();
+      onVideoEnded?.();
     };
 
     const onDurationChange = () => {
@@ -507,6 +508,7 @@ export default function VideoPlayer({ videoId, videoUrl, courseId, weekId, initi
       setIsPlaying(false);
       if (event.data === 0) {
         fireHeartbeatRef.current();
+        onVideoEnded?.();
       }
       stopHeartbeat();
       stopUiTimer();

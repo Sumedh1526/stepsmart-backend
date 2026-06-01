@@ -2233,31 +2233,146 @@ export default function DashboardPage() {
           <div
             style={{
               ...s.metricCards,
-              gridTemplateColumns: isCompact ? '1fr' : s.metricCards.gridTemplateColumns,
+              gridTemplateColumns: isCompact ? '1fr' : 'repeat(4, minmax(0, 1fr))',
             }}
           >
-            <RingMetricCard
-              value={completedCount}
-              label="lessons completed"
-              sublabel={`${weeks.length} lessons total`}
-              percent={weeks.length > 0 ? (completedCount / weeks.length) * 100 : 0}
-              ringColor="#1f8bb1"
-              trackColor="#d8e9f2"
-            />
-            <RingMetricCard
-              value={assignmentsSubmittedCount}
-              label="assignments submitted"
-              sublabel={`${assignmentsTotal} total assignments`}
-              percent={assignmentsTotal > 0 ? (assignmentsSubmittedCount / assignmentsTotal) * 100 : 0}
-              ringColor="#df9718"
-              trackColor="#f3e5cf"
-            />
-            <div style={s.scoreCard}>
-              <div style={s.scoreRow}>
-                <TrophyIcon />
-                <div style={s.scoreValue}>{courseScore}</div>
+            {/* Redesigned Card 1: Lessons */}
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(20, 49, 86, 0.08)',
+                borderRadius: '20px',
+                padding: '1.25rem',
+                boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '145px',
+              }}
+            >
+              <div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>
+                  Lessons
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'baseline' }}>
+                  <span>{completedCount}</span>
+                  <span style={{ fontSize: '1.25rem', color: '#94a3b8', fontWeight: 500 }}>/{weeks.length}</span>
+                </div>
               </div>
-              <div style={s.scoreLabel}>Course Score</div>
+              <div>
+                <div style={{ height: '6px', borderRadius: '999px', width: '100%', background: '#e2e8f0', overflow: 'hidden', marginBottom: '0.75rem' }}>
+                  <div style={{ height: '100%', borderRadius: '999px', background: 'var(--primary)', width: `${weeks.length > 0 ? (completedCount / weeks.length) * 100 : 0}%`, transition: 'width 0.3s ease' }} />
+                </div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span>{activeLesson ? `1 lesson from ${activeLesson.displayWeekNumber || ('Week ' + (activeLesson.weekNumber || activeLesson.groupNumber || '1'))}` : 'All complete'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Redesigned Card 2: Assignments */}
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(20, 49, 86, 0.08)',
+                borderRadius: '20px',
+                padding: '1.25rem',
+                boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '145px',
+              }}
+            >
+              <div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>
+                  Assignments
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'baseline' }}>
+                  <span>{assignmentsSubmittedCount}</span>
+                  <span style={{ fontSize: '1.25rem', color: '#94a3b8', fontWeight: 500 }}>/{assignmentsTotal}</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ height: '6px', borderRadius: '999px', width: '100%', background: '#e2e8f0', overflow: 'hidden', marginBottom: '0.75rem' }}>
+                  <div style={{ height: '100%', borderRadius: '999px', background: '#df3b3b', width: `${assignmentsTotal > 0 ? (assignmentsSubmittedCount / assignmentsTotal) * 100 : 0}%`, transition: 'width 0.3s ease' }} />
+                </div>
+                <div style={{ color: '#df3b3b', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 500 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>1 overdue soon</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Redesigned Card 3: Streak */}
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(20, 49, 86, 0.08)',
+                borderRadius: '20px',
+                padding: '1.25rem',
+                boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '145px',
+              }}
+            >
+              <div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>
+                  Streak
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>
+                  6 days
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '0.75rem' }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ height: '6px', flex: 1, borderRadius: '999px', background: '#198754' }} />
+                  ))}
+                </div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8125rem' }}>
+                  Log in today to hit 7
+                </div>
+              </div>
+            </div>
+
+            {/* Redesigned Card 4: Course Score */}
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(20, 49, 86, 0.08)',
+                borderRadius: '20px',
+                padding: '1.25rem',
+                boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: '145px',
+              }}
+            >
+              <div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <span>Course score</span>
+                  <span style={{ fontSize: '0.8rem', cursor: 'help', color: '#94a3b8' }} title="Weighted based on 40% lessons, 40% assignments, 20% streak">ⓘ</span>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>
+                  {courseScore}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', lineHeight: '1.3' }}>
+                  40% lessons · 40% assignments · 20% streak
+                </div>
+              </div>
             </div>
           </div>
 
