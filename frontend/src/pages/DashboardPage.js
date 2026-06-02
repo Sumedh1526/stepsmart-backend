@@ -443,11 +443,11 @@ const s = {
     fontWeight: 400,
   },
   continueCard: {
-    background: 'linear-gradient(180deg, #f4fbff 0%, #f5fbff 100%)',
-    border: '1px solid rgba(20, 49, 86, 0.11)',
-    borderRadius: '22px',
-    padding: '1.5rem',
-    boxShadow: '0 10px 26px rgba(15, 40, 80, 0.08)',
+    background: '#ffffff',
+    border: '1px solid rgba(20, 49, 86, 0.08)',
+    borderRadius: '20px',
+    padding: '1.25rem',
+    boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
   },
   activeCourse: {
     color: '#1f2937',
@@ -3171,19 +3171,7 @@ export default function DashboardPage() {
               {viewSubtitle && <div style={s.headerSub}>{viewSubtitle}</div>}
             </div>
 
-            {activeView === 'dashboard' ? (
-              <div style={s.profileWrap}>
-                <div style={s.profileAvatar}>{getInitials(displayName)}</div>
-                <div>
-                  <div style={s.profileName}>{displayName}</div>
-                  <div style={s.profileDate}>{currentDateLabel}</div>
-                </div>
-                <div style={s.bellWrap}>
-                  <BellIcon />
-                  <span style={s.bellDot} />
-                </div>
-              </div>
-            ) : activeView === 'cohort' ? (
+            {activeView === 'cohort' ? (
               <a
                 href="https://chat.whatsapp.com/mock-invite-code"
                 target="_blank"
