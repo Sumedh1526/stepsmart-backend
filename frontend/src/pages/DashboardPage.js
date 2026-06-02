@@ -2531,8 +2531,8 @@ export default function DashboardPage() {
     const activeGroups = showingVideos ? weekGroups : recordedSessionGroups;
 
     return (
-      <div style={s.card}>
-        <div style={{ ...s.panelHeader, justifyContent: 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
           <div style={s.courseTabs}>
             <button
               type="button"
@@ -2558,7 +2558,9 @@ export default function DashboardPage() {
         </div>
 
         {activeGroups.length === 0 ? (
-          <div style={s.empty}>No weeks have been released yet for this course.</div>
+          <div style={s.card}>
+            <div style={s.empty}>No weeks have been released yet for this course.</div>
+          </div>
         ) : (
           <div style={s.accordionList}>
             {activeGroups.map((group) => {
