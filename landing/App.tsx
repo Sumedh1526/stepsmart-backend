@@ -224,19 +224,22 @@ function LandingPage() {
     setEnrollmentStatus('loading');
     saveLeadToDemoDB(data);
 
-    if (!db) {
-      completeLeadSubmission(data.intent);
-      return;
-    }
-
     try {
-      const enrollmentsRef = collection(db, 'artifacts', appId, 'public', 'data', 'leads');
-      await addDoc(enrollmentsRef, {
-        ...data,
-        userId: user?.uid || 'anonymous',
-        submittedAt: serverTimestamp(),
-      });
+      const res = await fetch(
+        'https://6osmrsvdtg.execute-api.eu-north-1.amazonaws.com/prod/public/enroll',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: data.fullName,
+            email: data.email,
+            phone: data.phone,
+            masterclassId: 'pm-x-accelerator',
+          }),
+        }
+      );
 
+      if (!res.ok) throw new Error('Enrollment failed');
       completeLeadSubmission(data.intent);
     } catch (err) {
       setEnrollmentStatus('error');

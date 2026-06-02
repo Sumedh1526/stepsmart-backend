@@ -10,6 +10,7 @@ import {
   adminGetAllProgress,
   adminGetAllSubmissions,
   adminUpdateSupplementalContent,
+  adminGetLeads,
 } from '../utils/api';
 
 const COURSE_ID = 'course-001';
@@ -1493,6 +1494,99 @@ function SubmissionsTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// Leads Tab
+// ────────────────────────────────────────────────────────────────────────────────
+function LeadsTab() {
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    try {
+      const { data } = await adminGetLeads();
+      setLeads(data.leads || []);
+    } catch {
+      setError('Failed to load leads.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = leads.filter((lead) => {
+    const term = search.toLowerCase();
+    return (
+      (lead.name || '').toLowerCase().includes(term) ||
+      (lead.email || '').toLowerCase().includes(term) ||
+      (lead.phone || '').toLowerCase().includes(term)
+    );
+  });
+
+  if (loading) return <p style={{ color: 'var(--muted-foreground)' }}>Loading…</p>;
+  if (error) return <p style={{ color: 'var(--destructive)' }}>{error}</p>;
+
+  return (
+    <div>
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={s.cardTitle}>Landing Page Leads ({leads.length})</div>
+          <input
+            style={{ ...s.input, width: '250px', marginBottom: 0 }}
+            placeholder="Search by name, email, or phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {leads.length === 0 ? (
+          <p style={{ color: 'var(--muted-foreground)' }}>No leads submitted yet.</p>
+        ) : (
+          <table style={s.table}>
+            <thead>
+              <tr>
+                <th style={s.th}>Name</th>
+                <th style={s.th}>Email</th>
+                <th style={s.th}>Phone</th>
+                <th style={s.th}>Source</th>
+                <th style={s.th}>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((lead, i) => (
+                <tr key={lead.enrollmentId || i}>
+                  <td style={s.td}>
+                    <div style={{ fontWeight: 600 }}>{lead.name || '—'}</div>
+                  </td>
+                  <td style={s.td}>{lead.email || '—'}</td>
+                  <td style={s.td}>{lead.phone || '—'}</td>
+                  <td style={s.td}>
+                    <span style={{ ...s.badge, ...s.badgeInfo }}>
+                      {lead.masterclassId || 'default'}
+                    </span>
+                  </td>
+                  <td style={s.td}>
+                    {lead.timestamp ? new Date(lead.timestamp).toLocaleString() : '—'}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{ ...s.td, textAlign: 'center', color: 'var(--muted-foreground)' }}>
+                    No matches found for "{search}"
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // Main Admin Page
 // ────────────────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
@@ -1513,6 +1607,7 @@ export default function AdminPage() {
           { id: 'students', label: 'Students' },
           { id: 'progress', label: 'Progress' },
           { id: 'submissions', label: 'Submissions' },
+          { id: 'leads', label: 'Leads' },
         ].map((t) => (
           <button
             key={t.id}
@@ -1530,6 +1625,7 @@ export default function AdminPage() {
         {tab === 'students' && <StudentsTab />}
         {tab === 'progress' && <ProgressTab />}
         {tab === 'submissions' && <SubmissionsTab />}
+        {tab === 'leads' && <LeadsTab />}
       </div>
     </div>
   );

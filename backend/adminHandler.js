@@ -46,6 +46,7 @@ const cognito = new CognitoIdentityProviderClient({ region: process.env.AWS_REGI
 
 const COURSES_TABLE = process.env.COURSES_TABLE || 'lms-courses';
 const PROGRESS_TABLE = process.env.PROGRESS_TABLE || 'lms-progress';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const USER_POOL_ID = process.env.USER_POOL_ID || '';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stepsmart.net';
 const SUPPLEMENTAL_SK = 'SUPPLEMENTAL#GLOBAL';
@@ -459,6 +460,22 @@ async function getSubmissions(courseId) {
   return res(200, { submissions });
 }
 
+// GET /admin/leads
+// Returns all leads/enrollments from the landing page form.
+async function listLeads() {
+  const result = await ddb.send(new ScanCommand({
+    TableName: ENROLLMENTS_TABLE,
+  }));
+
+  const leads = (result.Items || []).sort((a, b) => {
+    const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  return res(200, { leads });
+}
+
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
@@ -504,6 +521,9 @@ exports.handler = async (event) => {
 
     // ── Assignments ──────────────────────────────────────────────────────
     if (method === 'GET' && resource === '/admin/courses/{courseId}/submissions') return await getSubmissions(courseId);
+
+    // ── Leads ─────────────────────────────────────────────────────────
+    if (method === 'GET' && resource === '/admin/leads') return await listLeads();
 
     return res(404, { message: `No handler for ${method} ${resource}` });
   } catch (err) {

@@ -85,6 +85,9 @@ export const adminGetAllProgress = (courseId) =>
 export const adminGetAllSubmissions = (courseId) =>
   api.get(`/admin/courses/${courseId}/submissions`);
 
+export const adminGetLeads = () =>
+  api.get('/admin/leads');
+
 // ─── Assignments ──────────────────────────────────────────────────────────────
 
 export const uploadAssignment = (
