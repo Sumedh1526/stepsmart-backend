@@ -11,6 +11,7 @@ const cognito = new CognitoIdentityProviderClient({ region: process.env.AWS_REGI
 const COURSES_TABLE = process.env.COURSES_TABLE || 'lms-courses';
 const PROGRESS_TABLE = process.env.PROGRESS_TABLE || 'lms-progress';
 const ASSIGNMENTS_TABLE = process.env.ASSIGNMENTS_TABLE || process.env.ASSIGNMENT_TABLE || 'lms-assignments';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stepsmart.net';
 const PASSING_PCT = 70;
 const HEARTBEAT_INTERVAL = 10;
@@ -45,18 +46,89 @@ const COURSE_NAME_OVERRIDES = {
   'course-001': 'PM -X Accelerator',
 };
 
-async function listMyCourses() {
-  const result = await ddb.send(new ScanCommand({
-    TableName: COURSES_TABLE,
-    FilterExpression: 'sk = :meta',
-    ExpressionAttributeValues: { ':meta': 'METADATA' },
-  }));
+async function checkEnrollment(userId, courseId, event) {
+  // 1. Admins bypass enrollment checks
+  const groupsClaim = event?.requestContext?.authorizer?.claims?.['cognito:groups'];
+  const groups = Array.isArray(groupsClaim)
+    ? groupsClaim
+    : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
+  if (groups.includes('admins')) return true;
 
-  const courses = (result.Items || []).map((item) => ({
-    courseId: item.courseId,
-    name: COURSE_NAME_OVERRIDES[item.courseId] || item.name,
-    description: item.description || '',
-  }));
+  if (!courseId) return false;
+
+  // 2. Fetch user's enrollment
+  try {
+    const result = await ddb.send(new GetCommand({
+      TableName: ENROLLMENTS_TABLE,
+      Key: { enrollmentId: userId },
+    }));
+    return result.Item && result.Item.courseId === courseId;
+  } catch (err) {
+    console.error('checkEnrollment error:', err);
+    return false;
+  }
+}
+
+async function listMyCourses(userId, event) {
+  const groupsClaim = event?.requestContext?.authorizer?.claims?.['cognito:groups'];
+  const groups = Array.isArray(groupsClaim)
+    ? groupsClaim
+    : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
+  const isAdmin = groups.includes('admins');
+
+  if (isAdmin) {
+    const result = await ddb.send(new ScanCommand({
+      TableName: COURSES_TABLE,
+      FilterExpression: 'sk = :meta',
+      ExpressionAttributeValues: { ':meta': 'METADATA' },
+    }));
+    const courses = (result.Items || []).map((item) => ({
+      courseId: item.courseId,
+      name: COURSE_NAME_OVERRIDES[item.courseId] || item.name,
+      description: item.description || '',
+    }));
+    return res(200, { courses });
+  }
+
+  // Regular students only see their enrolled course
+  let enrollment;
+  try {
+    const result = await ddb.send(new GetCommand({
+      TableName: ENROLLMENTS_TABLE,
+      Key: { enrollmentId: userId },
+    }));
+    enrollment = result.Item;
+  } catch (err) {
+    console.error('Failed to fetch user enrollment:', err);
+    return res(500, { message: 'Failed to load enrollment' });
+  }
+
+  if (!enrollment || !enrollment.courseId) {
+    return res(200, { courses: [] });
+  }
+
+  const enrolledCourseId = enrollment.courseId;
+  let courseMeta;
+  try {
+    const result = await ddb.send(new GetCommand({
+      TableName: COURSES_TABLE,
+      Key: { pk: `COURSE#${enrolledCourseId}`, sk: 'METADATA' },
+    }));
+    courseMeta = result.Item;
+  } catch (err) {
+    console.error('Failed to fetch course metadata:', err);
+    return res(500, { message: 'Failed to load course' });
+  }
+
+  if (!courseMeta) {
+    return res(200, { courses: [] });
+  }
+
+  const courses = [{
+    courseId: courseMeta.courseId,
+    name: COURSE_NAME_OVERRIDES[courseMeta.courseId] || courseMeta.name,
+    description: courseMeta.description || '',
+  }];
 
   return res(200, { courses });
 }
@@ -307,7 +379,7 @@ function getOrCreateEntry(entries, userId, profiles, currentUserId) {
 
 async function buildLeaderboard(courseId, currentUserId, event) {
   const userPoolId = deriveUserPoolId(event);
-  const [weeksResult, progressResult, assignmentsResult, userProfiles] = await Promise.all([
+  const [weeksResult, progressResult, assignmentsResult, userProfiles, enrollmentsResult] = await Promise.all([
     ddb.send(new QueryCommand({
       TableName: COURSES_TABLE,
       KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
@@ -339,7 +411,17 @@ async function buildLeaderboard(courseId, currentUserId, event) {
       console.error('Cognito user lookup failed while building leaderboard:', err);
       return new Map();
     }),
+    ddb.send(new ScanCommand({
+      TableName: ENROLLMENTS_TABLE,
+      FilterExpression: 'courseId = :cid',
+      ExpressionAttributeValues: { ':cid': courseId }
+    })).catch((err) => {
+      console.error('Enrollments scan failed while building leaderboard:', err);
+      return { Items: [] };
+    }),
   ]);
+
+  const enrolledUserIds = new Set((enrollmentsResult.Items || []).map(item => item.enrollmentId));
 
   const weekQuizMap = new Map(
     (weeksResult.Items || []).map((week) => [week.weekId, (week.quiz?.questions || []).length > 0]),
@@ -351,6 +433,7 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     const itemUserId = item.userId || (item.pk ? item.pk.replace('USER#', '') : null);
     const itemWeekId = item.weekId || (item.sk ? item.sk.split('#')[2] : null);
     if (!itemUserId || !itemWeekId) continue;
+    if (!enrolledUserIds.has(itemUserId)) continue;
 
     const hasQuiz = weekQuizMap.has(itemWeekId)
       ? weekQuizMap.get(itemWeekId)
@@ -374,6 +457,7 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     const itemUserId = item.userId || (item.sk ? item.sk.split('#')[1] : null);
     const itemWeekId = item.weekId || (item.pk ? item.pk.split('#')[3] : null);
     if (!itemUserId || !itemWeekId) continue;
+    if (!enrolledUserIds.has(itemUserId)) continue;
 
     const uniqueAssignmentId = item.assignmentId || itemWeekId;
     const assignmentKey = `${itemUserId}#${uniqueAssignmentId}`;
@@ -388,7 +472,7 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     entry.lastActivity = laterDate(entry.lastActivity, toIso(item.uploadedAt));
   }
 
-  if (!leaderboardEntries.has(currentUserId)) {
+  if (enrolledUserIds.has(currentUserId) && !leaderboardEntries.has(currentUserId)) {
     leaderboardEntries.set(
       currentUserId,
       makeLeaderboardEntry(currentUserId, userProfiles.get(currentUserId), currentUserId),
@@ -717,8 +801,17 @@ exports.handler = async (event) => {
     return res(400, { message: 'Invalid JSON body' });
   }
 
+  // Enrollment Verification Guard
+  const targetCourseId = courseId || body.courseId || body.courseID;
+  if (targetCourseId && resource !== '/courses/my') {
+    const enrolled = await checkEnrollment(userId, targetCourseId, event);
+    if (!enrolled) {
+      return res(403, { message: 'Forbidden: you are not enrolled in this course.' });
+    }
+  }
+
   try {
-    if (method === 'GET' && resource === '/courses/my') return await listMyCourses();
+    if (method === 'GET' && resource === '/courses/my') return await listMyCourses(userId, event);
     if (method === 'GET' && resource === '/courses/{courseId}/weeks') return await listCourseWeeks(courseId, event);
     if (method === 'GET' && resource === '/courses/{courseId}/weeks/{weekId}/qa') return await getQAQuestions(courseId, params.weekId);
     if (method === 'POST' && resource === '/courses/{courseId}/weeks/{weekId}/qa') return await postQAQuestion(courseId, params.weekId, userId, body, event);

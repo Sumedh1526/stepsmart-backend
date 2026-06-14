@@ -3,13 +3,14 @@
 // Auth:    Cognito Authorizer (JWT required)
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 
 const ddb = DynamoDBDocumentClient.from(
   new DynamoDBClient({ region: process.env.AWS_REGION }),
 );
 
 const ASSIGNMENTS_TABLE = process.env.ASSIGNMENTS_TABLE || process.env.ASSIGNMENT_TABLE || 'lms-assignments';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const FRONTEND_URL      = process.env.FRONTEND_URL || 'https://stepsmart.net';
 const MAX_FILE_BYTES    = 7 * 1024 * 1024; // 7 MB original-file limit
 
@@ -51,6 +52,29 @@ exports.handler = async (event) => {
   const { courseId, weekId, fileName, mimeType, fileBase64, assignmentId, assignmentTitle } = body;
   if (!courseId || !weekId || !fileName || !mimeType || !fileBase64)
     return res(400, { message: 'Missing required fields' });
+
+  // Verify enrollment (admins bypass this check)
+  const groupsClaim = event?.requestContext?.authorizer?.claims?.['cognito:groups'];
+  const groups = Array.isArray(groupsClaim)
+    ? groupsClaim
+    : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
+  const isAdmin = groups.includes('admins');
+
+  if (!isAdmin) {
+    try {
+      const enrollRes = await ddb.send(new GetCommand({
+        TableName: ENROLLMENTS_TABLE,
+        Key: { enrollmentId: userId },
+      }));
+      const enrollment = enrollRes.Item;
+      if (!enrollment || enrollment.courseId !== courseId) {
+        return res(403, { message: 'Forbidden: you are not enrolled in this course.' });
+      }
+    } catch (err) {
+      console.error('Failed to verify enrollment during assignment upload:', err);
+      return res(500, { message: 'Failed to verify enrollment.' });
+    }
+  }
 
   if (!ALLOWED_MIME_TYPES.has(mimeType))
     return res(400, { message: 'Unsupported file type. Upload PDF, Word, or PowerPoint.' });

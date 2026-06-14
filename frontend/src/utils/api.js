@@ -58,8 +58,8 @@ export const submitQuiz = (courseId, weekId, answers) =>
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
-export const adminGetStudents = () =>
-  api.get('/admin/students');
+export const adminGetStudents = (courseId) =>
+  api.get('/admin/students', { params: { courseId } });
 
 export const adminCreateStudent = (data) =>
   api.post('/admin/students', data);
@@ -87,6 +87,9 @@ export const adminGetAllSubmissions = (courseId) =>
 
 export const adminGetLeads = () =>
   api.get('/admin/leads');
+
+export const adminRunBackfill = () =>
+  api.get('/admin/backfill');
 
 // ─── Assignments ──────────────────────────────────────────────────────────────
 

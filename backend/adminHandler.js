@@ -152,45 +152,184 @@ function isAdminUser(event) {
 // ── Route handlers ────────────────────────────────────────────────────────────
 
 // GET /admin/students
-// Lists all Cognito users and flattens their attributes for easy consumption.
-async function listStudents() {
-  const result = await cognito.send(new ListUsersCommand({ UserPoolId: USER_POOL_ID }));
-  const students = (result.Users || []).map((u) => {
-    const attrs = {};
-    for (const a of u.Attributes || []) attrs[a.Name] = a.Value;
-    return {
-      Username: u.Username,
-      UserStatus: u.UserStatus,
-      UserCreateDate: u.UserCreateDate,
-      email: attrs.email || '',
-      name: attrs.name || '',
-    };
-  });
+// Lists all Cognito users enrolled in the given courseId and flattens their attributes.
+async function listStudents(courseId) {
+  if (!courseId) {
+    return res(400, { message: 'courseId query parameter is required' });
+  }
+
+  // 1. Get all enrollments for this course
+  let enrollmentsResult;
+  try {
+    enrollmentsResult = await ddb.send(new ScanCommand({
+      TableName: ENROLLMENTS_TABLE,
+      FilterExpression: 'courseId = :cid',
+      ExpressionAttributeValues: { ':cid': courseId }
+    }));
+  } catch (err) {
+    console.error('Failed to fetch enrollments:', err);
+    return res(500, { message: 'Failed to load enrolled roster' });
+  }
+  const enrolledUserIds = new Set((enrollmentsResult.Items || []).map(item => item.enrollmentId));
+
+  // 2. Get all Cognito users
+  let result;
+  try {
+    result = await cognito.send(new ListUsersCommand({ UserPoolId: USER_POOL_ID }));
+  } catch (err) {
+    console.error('Failed to list Cognito users:', err);
+    return res(500, { message: 'Failed to fetch Cognito users' });
+  }
+
+  // 3. Filter users to only enrolled ones
+  const students = (result.Users || [])
+    .filter(u => {
+      const attrs = {};
+      for (const a of u.Attributes || []) attrs[a.Name] = a.Value;
+      return enrolledUserIds.has(u.Username) || enrolledUserIds.has(attrs.sub);
+    })
+    .map((u) => {
+      const attrs = {};
+      for (const a of u.Attributes || []) attrs[a.Name] = a.Value;
+      return {
+        Username: u.Username,
+        UserStatus: u.UserStatus,
+        UserCreateDate: u.UserCreateDate,
+        email: attrs.email || '',
+        name: attrs.name || '',
+      };
+    });
+
   return res(200, { students });
 }
 
 // POST /admin/students
 // Creates a student in Cognito with a temporary password (FORCE_CHANGE_PASSWORD).
-// The student must reset their password on first login.
+// The student must reset their password on first login. Also enrolls them in the specified courseId.
 async function createStudent(body) {
-  const { email, name, tempPassword } = body;
-  if (!email || !name || !tempPassword) {
-    return res(400, { message: 'email, name, and tempPassword are required' });
+  const { email, name, tempPassword, courseId } = body;
+  if (!email || !name || !tempPassword || !courseId) {
+    return res(400, { message: 'email, name, tempPassword, and courseId are required' });
   }
 
-  await cognito.send(new AdminCreateUserCommand({
-    UserPoolId: USER_POOL_ID,
-    Username: email,
-    TemporaryPassword: tempPassword,
-    UserAttributes: [
-      { Name: 'email', Value: email },
-      { Name: 'email_verified', Value: 'true' },
-      { Name: 'name', Value: name },
-    ],
-    MessageAction: 'SUPPRESS',  // Do not send Cognito's default email; use your own onboarding flow
-  }));
+  let createRes;
+  try {
+    createRes = await cognito.send(new AdminCreateUserCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: email,
+      TemporaryPassword: tempPassword,
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'email_verified', Value: 'true' },
+        { Name: 'name', Value: name },
+      ],
+      MessageAction: 'SUPPRESS',
+    }));
+  } catch (err) {
+    console.error('Failed to create student in Cognito:', err);
+    return res(500, { message: err.message || 'Failed to create student.' });
+  }
 
-  return res(201, { message: `Student ${email} created successfully` });
+  const userId = createRes.User.Attributes.find(a => a.Name === 'sub')?.Value || createRes.User.Username;
+
+  try {
+    await ddb.send(new PutCommand({
+      TableName: ENROLLMENTS_TABLE,
+      Item: {
+        enrollmentId: userId,
+        userId,
+        courseId,
+        enrolledAt: new Date().toISOString()
+      }
+    }));
+  } catch (err) {
+    console.error('Failed to write student enrollment row:', err);
+    return res(500, { message: 'Student created but enrollment mapping failed.' });
+  }
+
+  return res(201, { message: `Student ${email} created successfully and enrolled in ${courseId}` });
+}
+
+// GET /admin/backfill
+async function runBackfill() {
+  console.log('Starting backfill operation in Lambda...');
+  
+  // 1. Setup metadata for course-002
+  try {
+    await ddb.send(new PutCommand({
+      TableName: COURSES_TABLE,
+      Item: {
+        pk: 'COURSE#course-002',
+        sk: 'METADATA',
+        courseId: 'course-002',
+        name: 'PM -X Accelerator (Batch 2)',
+        description: 'Product Management Accelerator Cohort 2',
+        createdAt: new Date().toISOString()
+      }
+    }));
+    console.log('course-002 METADATA setup complete.');
+  } catch (err) {
+    console.error('Failed to setup course-002 METADATA:', err);
+    return res(500, { message: `Metadata setup failed: ${err.message}` });
+  }
+
+  // 2. Fetch all Cognito users
+  let users = [];
+  try {
+    let paginationToken;
+    do {
+      const result = await cognito.send(new ListUsersCommand({
+        UserPoolId: USER_POOL_ID,
+        PaginationToken: paginationToken,
+      }));
+      users.push(...(result.Users || []));
+      paginationToken = result.PaginationToken;
+    } while (paginationToken);
+  } catch (err) {
+    console.error('Failed to fetch Cognito users:', err);
+    return res(500, { message: `Cognito listing failed: ${err.message}` });
+  }
+
+  // 3. Backfill enrollments
+  let enrolledCount = 0;
+  for (const user of users) {
+    const attrs = {};
+    for (const attr of (user.Attributes || [])) attrs[attr.Name] = attr.Value;
+    const userId = attrs.sub || user.Username;
+
+    if (!userId) continue;
+
+    // Check if they already have an enrollment record
+    try {
+      const existing = await ddb.send(new GetCommand({
+        TableName: ENROLLMENTS_TABLE,
+        Key: { enrollmentId: userId },
+      }));
+      if (existing.Item) {
+        console.log(`User ${userId} already has enrollment. Skipping.`);
+        continue;
+      }
+    } catch (err) {
+      console.warn(`Failed to check existing enrollment for ${userId}:`, err);
+    }
+
+    try {
+      await ddb.send(new PutCommand({
+        TableName: ENROLLMENTS_TABLE,
+        Item: {
+          enrollmentId: userId,
+          userId,
+          courseId: 'course-001',
+          enrolledAt: new Date().toISOString()
+        }
+      }));
+      enrolledCount++;
+    } catch (err) {
+      console.error(`Failed to enroll user ${userId}:`, err);
+    }
+  }
+
+  return res(200, { message: `Backfill successful. Enrolled ${enrolledCount} users in course-001. course-002 metadata initialized.` });
 }
 
 // GET /admin/courses/{courseId}/weeks
@@ -467,11 +606,13 @@ async function listLeads() {
     TableName: ENROLLMENTS_TABLE,
   }));
 
-  const leads = (result.Items || []).sort((a, b) => {
-    const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-    const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-    return dateB - dateA;
-  });
+  const leads = (result.Items || [])
+    .filter(item => item.masterclassId) // Exclude student enrollments!
+    .sort((a, b) => {
+      const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return dateB - dateA;
+    });
 
   return res(200, { leads });
 }
@@ -492,7 +633,7 @@ exports.handler = async (event) => {
     .replace('{courseID}', '{courseId}')
     .replace('{weekID}', '{weekId}');
   const params = event.pathParameters || {};
-  const courseId = params.courseId || params.courseID;
+  const courseId = params.courseId || params.courseID || event.queryStringParameters?.courseId;
   const weekId = params.weekId || params.weekID;
 
   let body = {};
@@ -504,8 +645,11 @@ exports.handler = async (event) => {
 
   try {
     // ── Students ──────────────────────────────────────────────────────
-    if (method === 'GET' && resource === '/admin/students') return await listStudents();
+    if (method === 'GET' && resource === '/admin/students') return await listStudents(courseId);
     if (method === 'POST' && resource === '/admin/students') return await createStudent(body);
+
+    // ── Backfill ──────────────────────────────────────────────────────
+    if (method === 'GET' && resource === '/admin/backfill') return await runBackfill();
 
     // ── Weeks ─────────────────────────────────────────────────────────
     if (method === 'GET' && resource === '/admin/courses/{courseId}/weeks') return await listWeeks(courseId);

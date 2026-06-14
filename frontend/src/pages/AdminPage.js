@@ -11,6 +11,7 @@ import {
   adminGetAllSubmissions,
   adminUpdateSupplementalContent,
   adminGetLeads,
+  adminRunBackfill,
 } from '../utils/api';
 
 const COURSE_ID = 'course-001';
@@ -118,17 +119,20 @@ const s = {
 // ────────────────────────────────────────────────────────────────────────────────
 // Students Tab
 // ────────────────────────────────────────────────────────────────────────────────
-function StudentsTab() {
+function StudentsTab({ courseId }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ email: '', name: '', tempPassword: '' });
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillMsg, setBackfillMsg] = useState('');
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [courseId]);
 
   async function load() {
-    try { const { data } = await adminGetStudents(); setStudents(data.students || []); }
+    setLoading(true);
+    try { const { data } = await adminGetStudents(courseId); setStudents(data.students || []); }
     catch { setMessage('Failed to load students.'); }
     finally { setLoading(false); }
   }
@@ -137,7 +141,7 @@ function StudentsTab() {
     e.preventDefault();
     setCreating(true); setMessage('');
     try {
-      await adminCreateStudent(form);
+      await adminCreateStudent({ ...form, courseId });
       setMessage(`Student ${form.email} created.`);
       setForm({ email: '', name: '', tempPassword: '' });
       load();
@@ -145,8 +149,36 @@ function StudentsTab() {
     finally { setCreating(false); }
   }
 
+  async function handleBackfill() {
+    if (!window.confirm('This will list all Cognito users and enroll them in Batch 1 if they have no enrollment, and set up Batch 2 metadata. Continue?')) return;
+    setBackfilling(true);
+    setBackfillMsg('');
+    try {
+      const { data } = await adminRunBackfill();
+      setBackfillMsg(`✓ ${data.message}`);
+      load();
+    } catch (err) {
+      setBackfillMsg(`⚠️ ${err.response?.data?.message || 'Backfill failed.'}`);
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
   return (
     <div>
+      <div style={{ ...s.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={s.cardTitle}>System Utilities</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>Initialize Batch 2 configurations and map existing Cognito users to Batch 1.</div>
+        </div>
+        <div>
+          <button style={{ ...s.btn, ...s.btnSecondary }} onClick={handleBackfill} disabled={backfilling}>
+            {backfilling ? 'Running Backfill...' : 'Run Backfill & Init Batch 2'}
+          </button>
+          {backfillMsg && <p style={{ ...s.message, marginTop: '0.5rem', marginBottom: 0, fontWeight: 600 }}>{backfillMsg}</p>}
+        </div>
+      </div>
+
       <div style={s.card}>
         <div style={s.cardTitle}>Add Student</div>
         <form onSubmit={handleCreate}>
@@ -252,6 +284,7 @@ function buildDraftBasicPayload(form) {
   if ((form.description || '').trim()) payload.description = form.description.trim();
   if ((form.youtubeUrl || '').trim()) payload.youtubeUrl = form.youtubeUrl.trim();
   if ((form.qaLink || '').trim()) payload.qaLink = form.qaLink.trim();
+  if ((form.transcript || '').trim()) payload.transcript = form.transcript.trim();
 
   return payload;
 }
@@ -277,7 +310,7 @@ function SectionSaveButton({ label, saving, disabled, onClick, message }) {
   );
 }
 
-function WeeksTab() {
+function WeeksTab({ courseId }) {
   const [weeks, setWeeks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(EMPTY_WEEK);
@@ -287,10 +320,11 @@ function WeeksTab() {
   const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [courseId]);
 
   async function load() {
-    try { const { data } = await adminGetWeeks(COURSE_ID); setWeeks((data.weeks || []).sort((a, b) => a.weekNumber - b.weekNumber)); }
+    setLoading(true);
+    try { const { data } = await adminGetWeeks(courseId); setWeeks((data.weeks || []).sort((a, b) => a.weekNumber - b.weekNumber)); }
     catch { setMessage('Failed to load weeks.'); }
     finally { setLoading(false); }
   }
@@ -334,12 +368,13 @@ function WeeksTab() {
         weekNumber: parseFloat(form.weekNumber),
         youtubeUrl: form.youtubeUrl,
         qaLink: form.qaLink,
+        transcript: form.transcript,
       };
       if (editingId) {
-        await adminUpdateWeek(COURSE_ID, editingId, payload);
+        await adminUpdateWeek(courseId, editingId, payload);
         setSectionMsg('basic', '✓ Basic info saved');
       } else {
-        const result = await adminCreateWeek(COURSE_ID, payload);
+        const result = await adminCreateWeek(courseId, payload);
         const newWeekId = result?.data?.week?.weekId;
         if (newWeekId) setEditingId(newWeekId);
         setSectionMsg('basic', '✓ Week created — you can now save other sections');
@@ -360,7 +395,7 @@ function WeeksTab() {
           ...buildDraftBasicPayload(form),
           ...payload,
         };
-        const createResult = await adminCreateWeek(COURSE_ID, draftPayload);
+        const createResult = await adminCreateWeek(courseId, draftPayload);
         createdWeek = createResult?.data?.week || null;
         targetWeekId = createdWeek?.weekId || null;
 
@@ -379,7 +414,7 @@ function WeeksTab() {
           qaLink: prev.qaLink || createdWeek.qaLink || '',
         }));
       } else {
-        await adminUpdateWeek(COURSE_ID, targetWeekId, payload);
+        await adminUpdateWeek(courseId, targetWeekId, payload);
       }
 
       setSectionMsg(sectionKey, createdWeek ? '✓ Saved and created week' : '✓ Saved');
@@ -389,13 +424,13 @@ function WeeksTab() {
   }
 
   async function handleToggleVisible(week) {
-    try { await adminUpdateWeek(COURSE_ID, week.weekId, { visible: !week.visible }); load(); }
+    try { await adminUpdateWeek(courseId, week.weekId, { visible: !week.visible }); load(); }
     catch { setMessage('Failed to update visibility.'); }
   }
 
   async function handleDelete(weekId) {
     if (!window.confirm('Delete this week? This cannot be undone.')) return;
-    try { await adminDeleteWeek(COURSE_ID, weekId); load(); }
+    try { await adminDeleteWeek(courseId, weekId); load(); }
     catch { setMessage('Delete failed.'); }
   }
 
@@ -1079,17 +1114,18 @@ function RecordedSessionEditor({ rec, i, updateItem, removeItem, courseId }) {
   );
 }
 
-function SupplementalContentTab() {
+function SupplementalContentTab({ courseId }) {
   const [data, setData] = useState({ assignments: [], liveRecordedSessions: [], calendarEvents: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [courseId]);
 
   async function load() {
+    setLoading(true);
     try {
-      const { data: resData } = await adminGetWeeks(COURSE_ID);
+      const { data: resData } = await adminGetWeeks(courseId);
       setData(normalizeSupplementalContent(resData.supplementalContent));
     } catch {
       setMessage('Failed to load supplemental content.');
@@ -1110,7 +1146,7 @@ function SupplementalContentTab() {
     e.preventDefault();
     setSaving(true); setMessage('');
     try {
-      await adminUpdateSupplementalContent(COURSE_ID, data);
+      await adminUpdateSupplementalContent(courseId, data);
       setMessage('Supplemental content saved successfully!');
     } catch (err) {
       setMessage(err.response?.data?.message || 'Save failed.');
@@ -1190,7 +1226,7 @@ function SupplementalContentTab() {
                 i={i}
                 updateItem={updateItem}
                 removeItem={removeItem}
-                courseId={COURSE_ID}
+                courseId={courseId}
               />
             ))}
           </div>
@@ -1305,20 +1341,21 @@ function SupplementalContentTab() {
 // ────────────────────────────────────────────────────────────────────────────────
 // Progress Tab
 // ────────────────────────────────────────────────────────────────────────────────
-function ProgressTab() {
+function ProgressTab({ courseId }) {
   const [data,     setData]     = useState([]);
   const [students, setStudents] = useState({});   // userId → name
   const [weeks,    setWeeks]    = useState({});    // weekId → title
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState('');
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [courseId]);
   async function load() {
+    setLoading(true);
     try {
       const [progressRes, studentsRes, weeksRes] = await Promise.all([
-        adminGetAllProgress(COURSE_ID),
-        adminGetStudents(),
-        adminGetWeeks(COURSE_ID),
+        adminGetAllProgress(courseId),
+        adminGetStudents(courseId),
+        adminGetWeeks(courseId),
       ]);
       setData(progressRes.data.progress || []);
 
@@ -1343,7 +1380,7 @@ function ProgressTab() {
 
   return (
     <div style={s.card}>
-      <div style={s.cardTitle}>Student Progress — {COURSE_ID}</div>
+      <div style={s.cardTitle}>Student Progress — {courseId}</div>
       {data.length === 0 ? <p style={{ color: 'var(--muted-foreground)' }}>No progress recorded yet.</p> : (
         <table style={s.table}>
           <thead>
@@ -1385,20 +1422,21 @@ function ProgressTab() {
 // ────────────────────────────────────────────────────────────────────────────────
 // Submissions Tab
 // ────────────────────────────────────────────────────────────────────────────────
-function SubmissionsTab() {
+function SubmissionsTab({ courseId }) {
   const [submissions, setSubmissions] = useState([]);
   const [students, setStudents] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [courseId]);
 
   async function load() {
+    setLoading(true);
     try {
       const [subRes, stuRes] = await Promise.all([
-        adminGetAllSubmissions(COURSE_ID),
-        adminGetStudents()
+        adminGetAllSubmissions(courseId),
+        adminGetStudents(courseId)
       ]);
       setSubmissions(subRes.data.submissions || []);
       
@@ -1431,7 +1469,7 @@ function SubmissionsTab() {
   return (
     <div style={s.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <div style={s.cardTitle}>Student Submissions — {COURSE_ID}</div>
+        <div style={s.cardTitle}>Student Submissions — {courseId}</div>
         <input 
           style={{ ...s.input, width: '250px', marginBottom: 0 }} 
           placeholder="Search by student or assignment..." 
@@ -1591,13 +1629,44 @@ function LeadsTab() {
 // ────────────────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const [tab, setTab] = useState('weeks');
+  const [currentCourseId, setCurrentCourseId] = useState(() => {
+    return localStorage.getItem('admin_selected_course_id') || 'course-001';
+  });
+
+  const handleCourseChange = (courseId) => {
+    setCurrentCourseId(courseId);
+    localStorage.setItem('admin_selected_course_id', courseId);
+  };
 
   return (
     <div style={s.page}>
       <nav style={s.nav}>
-        <span style={s.navBrand}>StepSmart Admin</span>
-        <span style={s.navSep}>|</span>
-        <Link to="/dashboard" style={s.backLink}>← Student View</Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+          <span style={s.navBrand}>StepSmart Admin</span>
+          <span style={s.navSep}>|</span>
+          <Link to="/dashboard" style={s.backLink}>← Student View</Link>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff', fontSize: '0.875rem', fontWeight: 600 }}>
+          <span>Batch:</span>
+          <select 
+            value={currentCourseId} 
+            onChange={(e) => handleCourseChange(e.target.value)}
+            style={{
+              padding: '0.3rem 0.6rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.12)',
+              color: '#fff',
+              outline: 'none',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+            }}
+          >
+            <option value="course-001" style={{ color: '#000' }}>Batch 1 (course-001)</option>
+            <option value="course-002" style={{ color: '#000' }}>Batch 2 (course-002)</option>
+          </select>
+        </div>
       </nav>
 
       <div style={s.tabs}>
@@ -1620,11 +1689,11 @@ export default function AdminPage() {
       </div>
 
       <div style={s.content}>
-        {tab === 'weeks' && <WeeksTab />}
-        {tab === 'supplemental' && <SupplementalContentTab />}
-        {tab === 'students' && <StudentsTab />}
-        {tab === 'progress' && <ProgressTab />}
-        {tab === 'submissions' && <SubmissionsTab />}
+        {tab === 'weeks' && <WeeksTab courseId={currentCourseId} />}
+        {tab === 'supplemental' && <SupplementalContentTab courseId={currentCourseId} />}
+        {tab === 'students' && <StudentsTab courseId={currentCourseId} />}
+        {tab === 'progress' && <ProgressTab courseId={currentCourseId} />}
+        {tab === 'submissions' && <SubmissionsTab courseId={currentCourseId} />}
         {tab === 'leads' && <LeadsTab />}
       </div>
     </div>
