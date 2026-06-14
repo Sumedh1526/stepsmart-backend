@@ -30,6 +30,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
 
 const PROGRESS_TABLE = process.env.PROGRESS_TABLE || 'lms-progress';
 const COURSES_TABLE = process.env.COURSES_TABLE || 'lms-courses';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stepsmart.net';
 
 function corsHeaders() {
@@ -64,6 +65,29 @@ exports.handler = async (event) => {
   const { courseId, weekId, answers } = body;
   if (!courseId || !weekId || !answers || typeof answers !== 'object') {
     return res(400, { message: 'Missing required fields: courseId, weekId, answers' });
+  }
+
+  // Verify enrollment
+  const groupsClaim = event?.requestContext?.authorizer?.claims?.['cognito:groups'];
+  const groups = Array.isArray(groupsClaim)
+    ? groupsClaim
+    : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
+  const isAdmin = groups.includes('admins');
+
+  if (!isAdmin) {
+    try {
+      const enrollRes = await ddb.send(new GetCommand({
+        TableName: ENROLLMENTS_TABLE,
+        Key: { enrollmentId: userId },
+      }));
+      const enrollment = enrollRes.Item;
+      if (!enrollment || enrollment.courseId !== courseId) {
+        return res(403, { message: 'Forbidden: you are not enrolled in this course.' });
+      }
+    } catch (err) {
+      console.error('Failed to verify enrollment:', err);
+      return res(500, { message: 'Failed to verify enrollment.' });
+    }
   }
 
   // Step 1: Fetch the correct answers from DynamoDB.

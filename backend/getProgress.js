@@ -14,7 +14,7 @@
 //   { progress, leaderboard: [ { rank, displayName, totalPoints, ... } ] } when includeLeaderboard=true
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand, ScanCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 const {
   CognitoIdentityProviderClient,
   ListUsersCommand,
@@ -29,6 +29,7 @@ const cognito = new CognitoIdentityProviderClient({ region: process.env.AWS_REGI
 const PROGRESS_TABLE = process.env.PROGRESS_TABLE || 'lms-progress';
 const COURSES_TABLE  = process.env.COURSES_TABLE  || 'lms-courses';
 const ASSIGNMENTS_TABLE = process.env.ASSIGNMENTS_TABLE || 'lms-assignments';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const FRONTEND_URL   = process.env.FRONTEND_URL   || 'https://stepsmart.net';
 
 function deriveUserPoolId(event) {
@@ -119,7 +120,7 @@ function isLectureComplete(progressItem, weekHasQuiz) {
 
 async function buildLeaderboard(courseId, currentUserId, event) {
   const userPoolId = deriveUserPoolId(event);
-  const [weeksResult, progressResult, assignmentsResult, userProfiles] = await Promise.all([
+  const [weeksResult, progressResult, assignmentsResult, userProfiles, enrollmentsResult] = await Promise.all([
     ddb.send(new QueryCommand({
       TableName: COURSES_TABLE,
       KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
@@ -151,7 +152,17 @@ async function buildLeaderboard(courseId, currentUserId, event) {
       console.error('Cognito user lookup failed while building leaderboard:', err);
       return new Map();
     }),
+    ddb.send(new ScanCommand({
+      TableName: ENROLLMENTS_TABLE,
+      FilterExpression: 'courseId = :cid',
+      ExpressionAttributeValues: { ':cid': courseId }
+    })).catch((err) => {
+      console.error('Enrollments scan failed while building leaderboard:', err);
+      return { Items: [] };
+    }),
   ]);
+
+  const enrolledUserIds = new Set((enrollmentsResult.Items || []).map(item => item.enrollmentId));
 
   const weekQuizMap = new Map(
     (weeksResult.Items || []).map((week) => [week.weekId, (week.quiz?.questions || []).length > 0]),
@@ -163,6 +174,7 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     const itemUserId = item.userId || (item.pk ? item.pk.replace('USER#', '') : null);
     const itemWeekId = item.weekId || (item.sk ? item.sk.split('#')[2] : null);
     if (!itemUserId || !itemWeekId) continue;
+    if (!enrolledUserIds.has(itemUserId)) continue;
 
     const hasQuiz = weekQuizMap.has(itemWeekId)
       ? weekQuizMap.get(itemWeekId)
@@ -186,6 +198,7 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     const itemUserId = item.userId || (item.sk ? item.sk.split('#')[1] : null);
     const itemWeekId = item.weekId || (item.pk ? item.pk.split('#')[3] : null);
     if (!itemUserId || !itemWeekId) continue;
+    if (!enrolledUserIds.has(itemUserId)) continue;
 
     const uniqueAssignmentId = item.assignmentId || itemWeekId;
     const assignmentKey = `${itemUserId}#${uniqueAssignmentId}`;
@@ -200,7 +213,7 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     entry.lastActivity = laterDate(entry.lastActivity, toIso(item.uploadedAt));
   }
 
-  if (!leaderboardEntries.has(currentUserId)) {
+  if (enrolledUserIds.has(currentUserId) && !leaderboardEntries.has(currentUserId)) {
     leaderboardEntries.set(
       currentUserId,
       makeLeaderboardEntry(currentUserId, userProfiles.get(currentUserId), currentUserId),
@@ -249,6 +262,29 @@ exports.handler = async (event) => {
   const courseId = event.pathParameters?.courseId || event.pathParameters?.courseID;
   if (!courseId) return res(400, { message: 'Missing courseId path parameter' });
   const includeLeaderboard = event.queryStringParameters?.includeLeaderboard === 'true';
+
+  // Verify enrollment
+  const groupsClaim = event?.requestContext?.authorizer?.claims?.['cognito:groups'];
+  const groups = Array.isArray(groupsClaim)
+    ? groupsClaim
+    : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
+  const isAdmin = groups.includes('admins');
+
+  if (!isAdmin) {
+    try {
+      const enrollRes = await ddb.send(new GetCommand({
+        TableName: ENROLLMENTS_TABLE,
+        Key: { enrollmentId: userId },
+      }));
+      const enrollment = enrollRes.Item;
+      if (!enrollment || enrollment.courseId !== courseId) {
+        return res(403, { message: 'Forbidden: you are not enrolled in this course.' });
+      }
+    } catch (err) {
+      console.error('Failed to verify enrollment:', err);
+      return res(500, { message: 'Failed to verify enrollment.' });
+    }
+  }
 
   // Query all progress items for this student in this course.
   // pk = "USER#<userId>"  AND  sk begins_with "PROGRESS#<courseId>#"

@@ -21,6 +21,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
 });
 
 const COURSES_TABLE = process.env.COURSES_TABLE || 'lms-courses';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://stepsmart.net';
 const SUPPLEMENTAL_SK = 'SUPPLEMENTAL#GLOBAL';
 
@@ -77,6 +78,23 @@ exports.handler = async (event) => {
     ? groupsClaim
     : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
   const isAdmin = groups.includes('admins');
+
+  // Verify enrollment
+  if (!isAdmin) {
+    try {
+      const enrollRes = await ddb.send(new GetCommand({
+        TableName: ENROLLMENTS_TABLE,
+        Key: { enrollmentId: userId },
+      }));
+      const enrollment = enrollRes.Item;
+      if (!enrollment || enrollment.courseId !== courseId) {
+        return res(403, { message: 'Forbidden: you are not enrolled in this course.' });
+      }
+    } catch (err) {
+      console.error('Failed to verify enrollment:', err);
+      return res(500, { message: 'Failed to verify enrollment.' });
+    }
+  }
 
   // Query all WEEK# items for this course in one request.
   let items;

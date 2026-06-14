@@ -15,6 +15,7 @@ const {
   DynamoDBDocumentClient,
   QueryCommand,
   ScanCommand,
+  GetCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'eu-north-1' });
@@ -23,6 +24,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient, {
 });
 
 const COURSES_TABLE = process.env.COURSES_TABLE || 'lms-courses';
+const ENROLLMENTS_TABLE = process.env.ENROLLMENTS_TABLE || 'lms-enrollments';
 const FRONTEND_URL  = process.env.FRONTEND_URL  || 'https://stepsmart.net';
 const COURSE_NAME_OVERRIDES = {
   'course-001': 'PM -X Accelerator',
@@ -50,27 +52,75 @@ exports.handler = async (event) => {
   const userId = event.requestContext?.authorizer?.claims?.sub;
   if (!userId) return res(401, { message: 'Unauthorized' });
 
-  // Fetch all METADATA items (one per course) from the courses table.
-  // For a small number of courses a Scan with a filter is fine.
-  // With many courses you'd add a GSI on 'type = METADATA'.
-  let items;
-  try {
-    const result = await ddb.send(new ScanCommand({
-      TableName: COURSES_TABLE,
-      FilterExpression: 'sk = :meta',
-      ExpressionAttributeValues: { ':meta': 'METADATA' },
+  // 1. Determine if the user is an admin
+  const groupsClaim = event?.requestContext?.authorizer?.claims?.['cognito:groups'];
+  const groups = Array.isArray(groupsClaim)
+    ? groupsClaim
+    : typeof groupsClaim === 'string' ? groupsClaim.split(',') : [];
+  const isAdmin = groups.includes('admins');
+
+  if (isAdmin) {
+    let items;
+    try {
+      const result = await ddb.send(new ScanCommand({
+        TableName: COURSES_TABLE,
+        FilterExpression: 'sk = :meta',
+        ExpressionAttributeValues: { ':meta': 'METADATA' },
+      }));
+      items = result.Items || [];
+    } catch (err) {
+      console.error('DynamoDB ScanCommand error:', err);
+      return res(500, { message: 'Failed to load courses' });
+    }
+
+    const courses = items.map((item) => ({
+      courseId:    item.courseId,
+      name:        COURSE_NAME_OVERRIDES[item.courseId] || item.name,
+      description: item.description || '',
     }));
-    items = result.Items || [];
-  } catch (err) {
-    console.error('DynamoDB ScanCommand error:', err);
-    return res(500, { message: 'Failed to load courses' });
+
+    return res(200, { courses });
   }
 
-  const courses = items.map((item) => ({
-    courseId:    item.courseId,
-    name:        COURSE_NAME_OVERRIDES[item.courseId] || item.name,
-    description: item.description || '',
-  }));
+  // 2. Regular students only see their enrolled course
+  let enrollment;
+  try {
+    const result = await ddb.send(new GetCommand({
+      TableName: ENROLLMENTS_TABLE,
+      Key: { enrollmentId: userId },
+    }));
+    enrollment = result.Item;
+  } catch (err) {
+    console.error('Failed to fetch user enrollment:', err);
+    return res(500, { message: 'Failed to load enrollment' });
+  }
+
+  if (!enrollment || !enrollment.courseId) {
+    return res(200, { courses: [] });
+  }
+
+  const enrolledCourseId = enrollment.courseId;
+  let courseMeta;
+  try {
+    const result = await ddb.send(new GetCommand({
+      TableName: COURSES_TABLE,
+      Key: { pk: `COURSE#${enrolledCourseId}`, sk: 'METADATA' },
+    }));
+    courseMeta = result.Item;
+  } catch (err) {
+    console.error('Failed to fetch course metadata:', err);
+    return res(500, { message: 'Failed to load course' });
+  }
+
+  if (!courseMeta) {
+    return res(200, { courses: [] });
+  }
+
+  const courses = [{
+    courseId:    courseMeta.courseId,
+    name:        COURSE_NAME_OVERRIDES[courseMeta.courseId] || courseMeta.name,
+    description: courseMeta.description || '',
+  }];
 
   return res(200, { courses });
 };
