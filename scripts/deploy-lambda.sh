@@ -2,22 +2,28 @@
 FUNCTION_KEY=$1
 
 # Map keys to lambda names
-declare -A LAMBDA_NAMES
-LAMBDA_NAMES[studentHandler]="lms-student"
-LAMBDA_NAMES[adminHandler]="lms-admin"
-LAMBDA_NAMES[uploadAssignment]="lms-uploadAssignment"
-LAMBDA_NAMES[publicHandler]="lms-publicHandler"
-
-if [ -z "$FUNCTION_KEY" ]; then
-  echo "Error: Please specify a function key (e.g. studentHandler, adminHandler, uploadAssignment)"
-  exit 1
-fi
-
-LAMBDA_NAME=${LAMBDA_NAMES[$FUNCTION_KEY]}
-if [ -z "$LAMBDA_NAME" ]; then
-  echo "Error: Unknown function key '$FUNCTION_KEY'"
-  exit 1
-fi
+case "$FUNCTION_KEY" in
+  studentHandler)
+    LAMBDA_NAME="lms-student"
+    ;;
+  adminHandler)
+    LAMBDA_NAME="lms-admin"
+    ;;
+  uploadAssignment)
+    LAMBDA_NAME="lms-uploadAssignment"
+    ;;
+  publicHandler)
+    LAMBDA_NAME="lms-publicHandler"
+    ;;
+  "")
+    echo "Error: Please specify a function key (e.g. studentHandler, adminHandler, uploadAssignment)"
+    exit 1
+    ;;
+  *)
+    echo "Error: Unknown function key '$FUNCTION_KEY'"
+    exit 1
+    ;;
+esac
 
 echo "Deploying $FUNCTION_KEY to Lambda $LAMBDA_NAME..."
 

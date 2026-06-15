@@ -1958,16 +1958,44 @@ function PlaceholderPanel({ title, body, actionLabel, onAction }) {
   );
 }
 
+// Module-level cache to persist data across client-side SPA navigation
+let clientDashboardCache = null;
+
 export default function DashboardPage() {
   const { isAdmin, logout, updateDisplayName, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [courses, setCourses] = useState([]);
-  const [weeks, setWeeks] = useState([]);
-  const [progressMap, setProgressMap] = useState({});
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [activeCourse, setActiveCourse] = useState(null);
+  const [courses, setCourses] = useState(() => {
+    if (clientDashboardCache && clientDashboardCache.username === user?.username) {
+      return clientDashboardCache.courses;
+    }
+    return [];
+  });
+  const [weeks, setWeeks] = useState(() => {
+    if (clientDashboardCache && clientDashboardCache.username === user?.username) {
+      return clientDashboardCache.weeks;
+    }
+    return [];
+  });
+  const [progressMap, setProgressMap] = useState(() => {
+    if (clientDashboardCache && clientDashboardCache.username === user?.username) {
+      return clientDashboardCache.progressMap;
+    }
+    return {};
+  });
+  const [leaderboard, setLeaderboard] = useState(() => {
+    if (clientDashboardCache && clientDashboardCache.username === user?.username) {
+      return clientDashboardCache.leaderboard;
+    }
+    return [];
+  });
+  const [activeCourse, setActiveCourse] = useState(() => {
+    if (clientDashboardCache && clientDashboardCache.username === user?.username) {
+      return clientDashboardCache.activeCourse;
+    }
+    return null;
+  });
   const [activeView, setActiveView] = useState(() => getInitialDashboardView(searchParams));
   const [activeCoursesTab, setActiveCoursesTab] = useState('videos');
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -1993,7 +2021,10 @@ export default function DashboardPage() {
   const [isCompact, setIsCompact] = useState(
     typeof window !== 'undefined' ? window.innerWidth < 980 : false,
   );
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const hasCache = clientDashboardCache && clientDashboardCache.username === user?.username;
+    return !hasCache;
+  });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -2067,7 +2098,10 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   async function loadData() {
-    setLoading(true);
+    const hasCache = clientDashboardCache && clientDashboardCache.username === user?.username;
+    if (!hasCache) {
+      setLoading(true);
+    }
     setError('');
 
     try {
@@ -2076,25 +2110,28 @@ export default function DashboardPage() {
       setCourses(courseList);
 
       if (courseList.length > 0) {
-        const course = courseList[0];
+        const course = activeCourse || courseList[0];
         setActiveCourse(course);
-        await loadCourse(course.courseId);
+        await loadCourse(course.courseId, courseList);
       }
     } catch {
-      setError('Failed to load your courses. Please refresh.');
+      if (!hasCache) {
+        setError('Failed to load your courses. Please refresh.');
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadCourse(courseId) {
+  async function loadCourse(courseId, courseList) {
     try {
       const [weeksRes, progressRes] = await Promise.all([
         getCourseWeeks(courseId),
         getProgress(courseId, { includeLeaderboard: true }),
       ]);
 
-      setWeeks(weeksRes.data.weeks || []);
+      const weeksData = weeksRes.data.weeks || [];
+      setWeeks(weeksData);
 
       const nextProgressMap = {};
       for (const progress of (progressRes.data.progress || [])) {
@@ -2102,11 +2139,26 @@ export default function DashboardPage() {
       }
 
       setProgressMap(nextProgressMap);
-      setLeaderboard(progressRes.data.leaderboard || []);
+      const leaderboardData = progressRes.data.leaderboard || [];
+      setLeaderboard(leaderboardData);
+
+      // Save to module cache
+      clientDashboardCache = {
+        username: user?.username,
+        courses: courseList || courses,
+        weeks: weeksData,
+        progressMap: nextProgressMap,
+        leaderboard: leaderboardData,
+        activeCourse: activeCourse || (courseList && courseList[0]) || (courses && courses[0]),
+      };
+
       setExpandedGroups({});
       setExpandedAssignments({});
     } catch {
-      setError('Failed to load course content.');
+      const hasCache = clientDashboardCache && clientDashboardCache.username === user?.username;
+      if (!hasCache) {
+        setError('Failed to load course content.');
+      }
     }
   }
 
@@ -2117,13 +2169,14 @@ export default function DashboardPage() {
     setError('');
 
     try {
-      await loadCourse(course.courseId);
+      await loadCourse(course.courseId, courses);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSignOut() {
+    clientDashboardCache = null; // Clear cache on sign out
     await logout();
     navigate('/login', { replace: true });
   }

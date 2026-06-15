@@ -525,7 +525,49 @@ async function getProgressForCourse(courseId, userId, event) {
   if (!includeLeaderboard) return res(200, { progress });
 
   try {
+    const cacheKey = { pk: `COURSE#${courseId}`, sk: 'LEADERBOARD' };
+    const cachedItemRes = await ddb.send(new GetCommand({
+      TableName: COURSES_TABLE,
+      Key: cacheKey,
+    })).catch((err) => {
+      console.error('Failed to get cached leaderboard:', err);
+      return { Item: null };
+    });
+
+    const cachedItem = cachedItemRes.Item;
+    const now = Date.now();
+    const cacheDurationMs = 5 * 60 * 1000; // 5 minutes cache
+
+    if (cachedItem && cachedItem.updatedAt && (now - cachedItem.updatedAt < cacheDurationMs) && Array.isArray(cachedItem.leaderboardData)) {
+      // Personalize the cached leaderboard for the requesting user
+      const personalizedLeaderboard = cachedItem.leaderboardData.map((entry) => ({
+        ...entry,
+        isCurrentUser: entry.userId === userId,
+      }));
+      return res(200, { progress, leaderboard: personalizedLeaderboard });
+    }
+
+    // Cache miss or expired: build fresh leaderboard
     const leaderboard = await buildLeaderboard(courseId, userId, event);
+
+    // Save to cache asynchronously (don't block the response)
+    const cacheData = leaderboard.map(entry => ({
+      ...entry,
+      isCurrentUser: false,
+    }));
+
+    ddb.send(new UpdateCommand({
+      TableName: COURSES_TABLE,
+      Key: cacheKey,
+      UpdateExpression: 'SET leaderboardData = :data, updatedAt = :now',
+      ExpressionAttributeValues: {
+        ':data': cacheData,
+        ':now': now,
+      },
+    })).catch((err) => {
+      console.error('Failed to update leaderboard cache:', err);
+    });
+
     return res(200, { progress, leaderboard });
   } catch (err) {
     console.error('Leaderboard build error:', err);
