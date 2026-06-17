@@ -3062,17 +3062,23 @@ export default function DashboardPage() {
               ? linkedinUrlInput
               : student.linkedinUrl;
             
-            const rawLinkedinUrl = savedLinkedin || `https://www.linkedin.com/in/${student.displayName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
-            let linkedinUrl = rawLinkedinUrl.trim();
-            if (linkedinUrl && !/^https?:\/\//i.test(linkedinUrl)) {
-              linkedinUrl = `https://${linkedinUrl}`;
+            const hasLinkedin = !!(savedLinkedin && savedLinkedin.trim());
+            let linkedinUrl = '';
+            if (hasLinkedin) {
+              linkedinUrl = savedLinkedin.trim();
+              if (linkedinUrl && !/^https?:\/\//i.test(linkedinUrl)) {
+                linkedinUrl = `https://${linkedinUrl}`;
+              }
             }
 
             return (
               <div
                 key={student.userId}
-                onClick={() => window.open(linkedinUrl, '_blank')}
-                className="cohort-card-hover"
+                onClick={hasLinkedin 
+                  ? () => window.open(linkedinUrl, '_blank')
+                  : () => alert(`${student.displayName} has not provided a LinkedIn profile.`)
+                }
+                className={hasLinkedin ? "cohort-card-hover" : ""}
                 style={{
                   background: '#ffffff',
                   border: '1px solid rgba(20, 49, 86, 0.08)',
@@ -3084,7 +3090,7 @@ export default function DashboardPage() {
                   justifyContent: 'center',
                   textAlign: 'center',
                   boxShadow: '0 8px 20px rgba(15, 40, 80, 0.04)',
-                  cursor: 'pointer',
+                  cursor: hasLinkedin ? 'pointer' : 'default',
                   transition: 'all 0.2s ease',
                 }}
               >
@@ -3119,10 +3125,38 @@ export default function DashboardPage() {
                   style={{
                     fontSize: '0.8125rem',
                     color: 'var(--muted-foreground)',
+                    marginBottom: '0.5rem',
                   }}
                 >
                   {student.completedLectures} lessons • {student.totalPoints} pts
                 </div>
+                {hasLinkedin ? (
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--primary)',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                      <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+                    </svg>
+                    LinkedIn Profile
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--muted-foreground)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    LinkedIn not provided
+                  </div>
+                )}
               </div>
             );
           })}
