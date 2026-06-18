@@ -641,7 +641,7 @@ export default function LearnPage() {
 
   const shellStyle = {
     ...s.shell,
-    gridTemplateColumns: isCompact ? '1fr' : '250px minmax(0, 1fr)',
+    gridTemplateColumns: isCompact ? '1fr' : '210px minmax(0, 1fr)',
   };
 
   const sidebarStyle = {
