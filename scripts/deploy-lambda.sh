@@ -7,16 +7,22 @@ case "$FUNCTION_KEY" in
     LAMBDA_NAME="lms-student"
     ;;
   adminHandler)
-    LAMBDA_NAME="lms-admin"
+    LAMBDA_NAME="adminHandler"
+    ;;
+  getCourseWeeks)
+    LAMBDA_NAME="lms-getCourseWeeks"
+    ;;
+  getProgress)
+    LAMBDA_NAME="lms-getProgress"
     ;;
   uploadAssignment)
-    LAMBDA_NAME="lms-uploadAssignment"
+    LAMBDA_NAME="uploadAssignment"
     ;;
   publicHandler)
     LAMBDA_NAME="lms-publicHandler"
     ;;
   "")
-    echo "Error: Please specify a function key (e.g. studentHandler, adminHandler, uploadAssignment)"
+    echo "Error: Please specify a function key (e.g. studentHandler, adminHandler, getCourseWeeks, getProgress)"
     exit 1
     ;;
   *)

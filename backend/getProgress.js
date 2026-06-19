@@ -164,8 +164,17 @@ async function buildLeaderboard(courseId, currentUserId, event) {
 
   const enrolledUserIds = new Set((enrollmentsResult.Items || []).map(item => item.enrollmentId));
 
+  function hasSupplementalStudentContent(week) {
+    return (week.assignments?.length || 0) > 0
+      || (week.liveRecordedSessions?.length || 0) > 0
+      || (week.calendarEvents?.length || 0) > 0;
+  }
+  const validWeeks = (weeksResult.Items || []).filter(
+    (w) => w.visible === true || hasSupplementalStudentContent(w)
+  );
+
   const weekQuizMap = new Map(
-    (weeksResult.Items || []).map((week) => [week.weekId, (week.quiz?.questions || []).length > 0]),
+    validWeeks.map((week) => [week.weekId, (week.quiz?.questions || []).length > 0]),
   );
 
   const leaderboardEntries = new Map();
@@ -176,18 +185,22 @@ async function buildLeaderboard(courseId, currentUserId, event) {
     if (!itemUserId || !itemWeekId) continue;
     if (!enrolledUserIds.has(itemUserId)) continue;
 
-    const hasQuiz = weekQuizMap.has(itemWeekId)
-      ? weekQuizMap.get(itemWeekId)
-      : item.quizTotal !== null && item.quizTotal !== undefined;
+    if (!weekQuizMap.has(itemWeekId)) continue;
+    const hasQuiz = weekQuizMap.get(itemWeekId);
+
     const entry = getOrCreateEntry(leaderboardEntries, itemUserId, userProfiles, currentUserId);
-    if (item.videoComplete) {
+    
+    // A lecture is considered complete if the week has a quiz and the quiz is passed,
+    // or if the week doesn't have a quiz and the video is complete.
+    const isComplete = hasQuiz ? !!item.quizPassed : !!item.videoComplete;
+    if (isComplete) {
       entry.completedLectures += 1;
       entry.score += 1;
       entry.totalPoints += 1;
     }
     if (item.quizPassed) {
       entry.completedQuizzes += 1;
-      entry.score += 2; // Award points for quizzes too? Let's assume 2 points for quiz
+      entry.score += 2;
       entry.totalPoints += 2;
     }
     entry.lastActivity = laterDate(entry.lastActivity, toIso(item.videoCompletedAt || item.lastSeen));

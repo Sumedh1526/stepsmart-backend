@@ -11,6 +11,7 @@ import {
   adminGetAllSubmissions,
   adminUpdateSupplementalContent,
   adminGetLeads,
+  getMyCourses,
 } from '../utils/api';
 
 const COURSE_ID = 'course-001';
@@ -290,7 +291,80 @@ function WeeksTab({ courseId }) {
   const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
 
+  // States for importing from other courses
+  const [importCourseId, setImportCourseId] = useState('');
+  const [importCoursesList, setImportCoursesList] = useState([]);
+  const [importWeeks, setImportWeeks] = useState([]);
+  const [importWeekId, setImportWeekId] = useState('');
+  const [importOptions, setImportOptions] = useState({
+    quiz: true,
+    docs: true,
+    resources: true,
+    assignments: true,
+    transcript: true,
+  });
+  const [importMessage, setImportMessage] = useState('');
+  const [importWeeksLoading, setImportWeeksLoading] = useState(false);
+
   useEffect(() => { load(); }, [courseId]);
+
+  // Load list of available courses/batches for the import dropdown
+  useEffect(() => {
+    async function fetchCourses() {
+      try {
+        const { data } = await getMyCourses();
+        if (data.courses && data.courses.length > 0) {
+          setImportCoursesList(data.courses);
+          const other = data.courses.find(c => c.courseId !== courseId);
+          if (other) {
+            setImportCourseId(other.courseId);
+          } else {
+            setImportCourseId(data.courses[0].courseId);
+          }
+        } else {
+          setImportCoursesList([
+            { courseId: 'course-001', name: 'Batch 1 (course-001)' },
+            { courseId: 'course-002', name: 'Batch 2 (course-002)' }
+          ]);
+          setImportCourseId(courseId === 'course-002' ? 'course-001' : 'course-002');
+        }
+      } catch (err) {
+        console.error('Failed to fetch courses for import:', err);
+        setImportCoursesList([
+          { courseId: 'course-001', name: 'Batch 1 (course-001)' },
+          { courseId: 'course-002', name: 'Batch 2 (course-002)' }
+        ]);
+        setImportCourseId(courseId === 'course-002' ? 'course-001' : 'course-002');
+      }
+    }
+    fetchCourses();
+  }, [courseId]);
+
+  // Fetch weeks for the selected source course
+  useEffect(() => {
+    if (!importCourseId) return;
+    async function fetchImportWeeks() {
+      setImportWeeksLoading(true);
+      setImportMessage('');
+      try {
+        const { data } = await adminGetWeeks(importCourseId);
+        const filteredWeeks = (data.weeks || []).filter(w => w.weekId !== '__supplemental__');
+        setImportWeeks(filteredWeeks);
+        if (filteredWeeks.length > 0) {
+          setImportWeekId(filteredWeeks[0].weekId);
+        } else {
+          setImportWeekId('');
+        }
+      } catch (err) {
+        console.error('Failed to fetch source weeks:', err);
+        setImportWeeks([]);
+        setImportWeekId('');
+      } finally {
+        setImportWeeksLoading(false);
+      }
+    }
+    fetchImportWeeks();
+  }, [importCourseId]);
 
   async function load() {
     setLoading(true);
@@ -310,6 +384,7 @@ function WeeksTab({ courseId }) {
   function startAdd() {
     setForm({ ...EMPTY_WEEK, weekNumber: String(weeks.length + 1) });
     setEditingId(null); setShowForm(true); setMessage(''); clearSectionMessages();
+    setImportMessage('');
   }
 
   function startEdit(week) {
@@ -326,6 +401,71 @@ function WeeksTab({ courseId }) {
       calendarEvents: week.calendarEvents || [],
     });
     setEditingId(week.weekId); setShowForm(true); setMessage(''); clearSectionMessages();
+    setImportMessage('');
+  }
+
+  function handleImport() {
+    if (!importWeekId) {
+      setImportMessage('❌ Please select a week to import from.');
+      return;
+    }
+    const sourceWeek = importWeeks.find(w => w.weekId === importWeekId);
+    if (!sourceWeek) {
+      setImportMessage('❌ Selected week not found.');
+      return;
+    }
+
+    const updates = {};
+    const importedItemsList = [];
+
+    if (importOptions.quiz && sourceWeek.quiz?.questions) {
+      updates.quiz = {
+        questions: sourceWeek.quiz.questions.map((q) => ({
+          ...q,
+          id: makeClientId('q'),
+        })),
+      };
+      importedItemsList.push('Quiz');
+    }
+    if (importOptions.docs && sourceWeek.docs) {
+      updates.docs = sourceWeek.docs.map((d) => ({
+        ...d,
+        id: makeClientId('doc'),
+      }));
+      importedItemsList.push('Reference Documents');
+    }
+    if (importOptions.resources && sourceWeek.resources) {
+      updates.resources = sourceWeek.resources.map((r) => ({
+        ...r,
+        id: makeClientId('r'),
+      }));
+      importedItemsList.push('Resources');
+    }
+    if (importOptions.assignments && sourceWeek.assignments) {
+      updates.assignments = sourceWeek.assignments.map((a) => ({
+        ...a,
+        id: makeClientId('assignment'),
+      }));
+      importedItemsList.push('Assignments');
+    }
+    if (importOptions.transcript && sourceWeek.transcript) {
+      updates.transcript = sourceWeek.transcript;
+      importedItemsList.push('Transcript');
+    }
+
+    if (importedItemsList.length === 0) {
+      setImportMessage('⚠️ No sections were selected for import.');
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      ...updates,
+    }));
+
+    setImportMessage(`✓ Imported ${importedItemsList.join(', ')} from ${
+      importCoursesList.find((c) => c.courseId === importCourseId)?.name || importCourseId
+    } - ${sourceWeek.title || 'Untitled'}. Make sure to click save on each section below.`);
   }
 
   async function handleSaveBasicInfo(e) {
@@ -536,6 +676,105 @@ function WeeksTab({ courseId }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.1rem' }}>
             <div style={s.cardTitle}>{editingId ? 'Edit Week' : 'New Week'}</div>
             <button type="button" style={{ ...s.btn, ...s.btnSecondary }} onClick={() => setShowForm(false)}>✕ Close</button>
+          </div>
+
+          {/* ── Import Panel ────────────────────────────────────────────── */}
+          <div style={{
+            background: 'linear-gradient(135deg, hsl(210, 100%, 98%) 0%, hsl(210, 100%, 96%) 100%)',
+            border: '1px solid hsl(210, 100%, 85%)',
+            borderRadius: '12px',
+            padding: '1.25rem',
+            marginBottom: '1.5rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}>
+            <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'hsl(210, 100%, 25%)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <span>📥</span> Import Quiz & Documents from Another Cohort
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ ...s.label, color: 'hsl(210, 100%, 20%)' }}>Source Batch</label>
+                <select
+                  value={importCourseId}
+                  onChange={(e) => setImportCourseId(e.target.value)}
+                  style={{ ...s.input, marginBottom: 0 }}
+                >
+                  {importCoursesList.map(c => (
+                    <option key={c.courseId} value={c.courseId}>{c.name || c.courseId}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ ...s.label, color: 'hsl(210, 100%, 20%)' }}>Source Week</label>
+                {importWeeksLoading ? (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', padding: '0.6rem 0' }}>Loading weeks...</div>
+                ) : importWeeks.length === 0 ? (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', padding: '0.6rem 0' }}>No weeks found in source batch.</div>
+                ) : (
+                  <select
+                    value={importWeekId}
+                    onChange={(e) => setImportWeekId(e.target.value)}
+                    style={{ ...s.input, marginBottom: 0 }}
+                  >
+                    {importWeeks.map(w => (
+                      <option key={w.weekId} value={w.weekId}>W{w.weekNumber}: {w.title}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {importWeeks.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ ...s.label, color: 'hsl(210, 100%, 20%)', marginBottom: '0.5rem' }}>Items to Import</label>
+                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={importOptions.quiz} onChange={(e) => setImportOptions({ ...importOptions, quiz: e.target.checked })} />
+                    Quiz Questions ({importWeeks.find(w => w.weekId === importWeekId)?.quiz?.questions?.length || 0})
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={importOptions.docs} onChange={(e) => setImportOptions({ ...importOptions, docs: e.target.checked })} />
+                    Reference Docs ({importWeeks.find(w => w.weekId === importWeekId)?.docs?.length || 0})
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={importOptions.resources} onChange={(e) => setImportOptions({ ...importOptions, resources: e.target.checked })} />
+                    Resources ({importWeeks.find(w => w.weekId === importWeekId)?.resources?.length || 0})
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={importOptions.assignments} onChange={(e) => setImportOptions({ ...importOptions, assignments: e.target.checked })} />
+                    Assignments ({importWeeks.find(w => w.weekId === importWeekId)?.assignments?.length || 0})
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={importOptions.transcript} onChange={(e) => setImportOptions({ ...importOptions, transcript: e.target.checked })} />
+                    Transcript
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              style={{ ...s.btn, background: 'hsl(210, 100%, 35%)', color: '#fff' }}
+              onClick={handleImport}
+              disabled={importWeeks.length === 0 || importWeeksLoading}
+            >
+              📥 Import Selected Content
+            </button>
+
+            {importMessage && (
+              <div style={{
+                marginTop: '0.75rem',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: importMessage.startsWith('✓') ? 'var(--success-fg, #15803d)' : 'var(--destructive, #dc2626)',
+                background: importMessage.startsWith('✓') ? 'var(--success-light)' : 'hsl(0, 84%, 96%)',
+                border: `1px solid ${importMessage.startsWith('✓') ? 'var(--success)' : 'var(--destructive)'}`,
+                padding: '0.6rem 0.85rem',
+                borderRadius: '8px'
+              }}>
+                {importMessage}
+              </div>
+            )}
           </div>
 
           {/* ── Basic Info ──────────────────────────────────────────────── */}
@@ -1309,6 +1548,135 @@ function SupplementalContentTab({ courseId }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// Daily Reminders Tab
+// ────────────────────────────────────────────────────────────────────────────────
+function RemindersTab({ courseId }) {
+  const [reminders, setReminders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => { load(); }, [courseId]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { data: resData } = await adminGetWeeks(courseId);
+      const rawReminders = resData.supplementalContent?.reminders;
+      setReminders(Array.isArray(rawReminders) ? rawReminders : []);
+    } catch {
+      setMessage('Failed to load reminders.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    setMessage('');
+    try {
+      await adminUpdateSupplementalContent(courseId, { reminders });
+      setMessage('Reminders saved successfully!');
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const addReminder = () => {
+    setReminders(prev => [...prev, { id: 'rem-' + Date.now(), title: '', deadline: '' }]);
+  };
+
+  const updateReminder = (idx, field, val) => {
+    setReminders(prev => {
+      const list = [...prev];
+      list[idx] = { ...list[idx], [field]: val };
+      return list;
+    });
+  };
+
+  const removeReminder = (idx) => {
+    setReminders(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  if (loading) return <p style={{ color: 'var(--muted-foreground)', padding: '2rem 0', textAlign: 'center' }}>Loading daily reminders...</p>;
+
+  return (
+    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{
+        background: 'linear-gradient(135deg, hsl(195, 83%, 98%) 0%, hsl(195, 83%, 95%) 100%)',
+        border: '1px dashed rgba(195, 83%, 38%, 0.3)',
+        borderRadius: '16px',
+        padding: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.4rem',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
+        <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>⏰</span> Weekly Reminder
+        </div>
+        <div style={{ fontSize: '0.875rem', color: 'var(--muted-foreground)', lineHeight: 1.5 }}>
+          Set student weekly reminders and deadlines. These reminders will appear on all student dashboards.
+        </div>
+      </div>
+
+      {message && (
+        <div style={{
+          padding: '0.85rem 1.25rem',
+          borderRadius: '10px',
+          background: message.includes('failed') || message.includes('Failed') ? 'hsl(0, 84%, 96%)' : 'var(--success-light)',
+          color: message.includes('failed') || message.includes('Failed') ? 'var(--destructive)' : 'var(--success)',
+          border: `1px solid ${message.includes('failed') || message.includes('Failed') ? 'var(--destructive)' : 'var(--success)'}`,
+          fontWeight: 600,
+          fontSize: '0.875rem'
+        }}>
+          {message}
+        </div>
+      )}
+
+      <div style={s.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={s.cardTitle}>Configure Reminders</div>
+          <button type="button" style={s.btn} onClick={addReminder}>+ Add Reminder</button>
+        </div>
+
+        {reminders.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', border: '1.5px dashed var(--border)', borderRadius: '12px', background: 'var(--background)' }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>⏰</span>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--muted-foreground)' }}>No daily reminders set. Add one above!</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {reminders.map((rem, i) => (
+              <div key={rem.id || i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '1rem', alignItems: 'end', background: '#fff', border: '1px solid var(--border)', padding: '1rem', borderRadius: '12px' }}>
+                <div>
+                  <label style={s.label}>Reminder Action / Title</label>
+                  <input style={{ ...s.input, marginBottom: 0 }} placeholder="e.g. Complete Quiz" value={rem.title} onChange={e => updateReminder(i, 'title', e.target.value)} />
+                </div>
+                <div>
+                  <label style={s.label}>Deadline Text / Subtitle</label>
+                  <input style={{ ...s.input, marginBottom: 0 }} placeholder="e.g. Deadline: 22mn 22s" value={rem.deadline} onChange={e => updateReminder(i, 'deadline', e.target.value)} />
+                </div>
+                <button type="button" style={{ ...s.btn, ...s.btnDanger, height: '38px', borderRadius: '8px' }} onClick={() => removeReminder(i)}>Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button style={{ ...s.btn, padding: '0.85rem 2.5rem', fontSize: '0.9rem', borderRadius: '10px', boxShadow: 'var(--shadow-md)' }} type="submit" disabled={saving}>
+          {saving ? 'Saving changes...' : 'Save Reminders ✓'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // Progress Tab
 // ────────────────────────────────────────────────────────────────────────────────
 function ProgressTab({ courseId }) {
@@ -1643,6 +2011,7 @@ export default function AdminPage() {
         {[
           { id: 'weeks', label: 'Manage Weeks' },
           { id: 'supplemental', label: 'Supplemental Content' },
+          { id: 'reminders', label: 'Weekly Reminder' },
           { id: 'students', label: 'Students' },
           { id: 'progress', label: 'Progress' },
           { id: 'submissions', label: 'Submissions' },
@@ -1661,6 +2030,7 @@ export default function AdminPage() {
       <div style={s.content}>
         {tab === 'weeks' && <WeeksTab courseId={currentCourseId} />}
         {tab === 'supplemental' && <SupplementalContentTab courseId={currentCourseId} />}
+        {tab === 'reminders' && <RemindersTab courseId={currentCourseId} />}
         {tab === 'students' && <StudentsTab courseId={currentCourseId} />}
         {tab === 'progress' && <ProgressTab courseId={currentCourseId} />}
         {tab === 'submissions' && <SubmissionsTab courseId={currentCourseId} />}
