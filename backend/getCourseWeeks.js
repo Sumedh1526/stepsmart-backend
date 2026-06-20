@@ -145,6 +145,7 @@ exports.handler = async (event) => {
     resources: w.resources || [],
     docs: w.docs || [],
     transcript: w.transcript || null,
+    textContent: w.textContent || null,
     assignments: w.assignments || [],
     liveRecordedSessions: w.liveRecordedSessions || [],
     calendarEvents: w.calendarEvents || [],
