@@ -214,6 +214,7 @@ const EMPTY_WEEK = {
   title: '',
   description: '',
   weekNumber: '',
+  weekTitle: '',
   youtubeUrl: '',
   qaLink: '',
   transcript: '',
@@ -252,6 +253,7 @@ function buildDraftBasicPayload(form) {
 
   if (Number.isFinite(parsedWeekNumber)) payload.weekNumber = parsedWeekNumber;
   if ((form.title || '').trim()) payload.title = form.title.trim();
+  if ((form.weekTitle || '').trim()) payload.weekTitle = form.weekTitle.trim();
   if ((form.description || '').trim()) payload.description = form.description.trim();
   if ((form.youtubeUrl || '').trim()) payload.youtubeUrl = form.youtubeUrl.trim();
   if ((form.qaLink || '').trim()) payload.qaLink = form.qaLink.trim();
@@ -390,6 +392,7 @@ function WeeksTab({ courseId }) {
   function startEdit(week) {
     setForm({
       title: week.title, description: week.description, weekNumber: String(week.weekNumber),
+      weekTitle: week.weekTitle || '',
       youtubeUrl: week.youtubeUrl || '',
       qaLink: week.qaLink || '',
       transcript: week.transcript || '',
@@ -475,6 +478,7 @@ function WeeksTab({ courseId }) {
       const payload = {
         title: form.title,
         description: form.description,
+        weekTitle: form.weekTitle,
         weekNumber: parseFloat(form.weekNumber),
         youtubeUrl: form.youtubeUrl,
         qaLink: form.qaLink,
@@ -791,8 +795,12 @@ function WeeksTab({ courseId }) {
                   value={form.youtubeUrl} onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })} />
               </div>
             </div>
-            <label style={s.label}>Title</label>
-            <input style={s.input} type="text" placeholder="Week title"
+            <label style={s.label}>Week Title / Module Title (Optional)</label>
+            <input style={s.input} type="text" placeholder="e.g. Product Foundations (displayed next to 'Week 1')"
+              value={form.weekTitle || ''} onChange={(e) => setForm({ ...form, weekTitle: e.target.value })} />
+
+            <label style={s.label}>Lesson Title</label>
+            <input style={s.input} type="text" placeholder="e.g. Introduction to Product Management"
               value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
             <label style={s.label}>Description</label>
             <textarea style={s.textarea} placeholder="Short description shown on dashboard"

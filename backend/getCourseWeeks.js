@@ -137,6 +137,7 @@ exports.handler = async (event) => {
     courseId: w.courseId || courseId,
     weekNumber: w.weekNumber,
     title: w.title,
+    weekTitle: w.weekTitle || '',
     description: w.description,
     youtubeUrl: w.youtubeUrl || null,
     qaLink: w.qaLink || null,

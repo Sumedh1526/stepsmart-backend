@@ -1250,12 +1250,17 @@ function buildWeekGroups(weeks) {
         groups.set(groupNumber, {
           groupNumber,
           lessons: [],
+          weekTitle: '',
         });
       }
 
       const group = groups.get(groupNumber);
       const lessonNumber = `${groupNumber}.${group.lessons.length + 1}`;
       group.lessons.push({ ...week, displayWeekNumber: lessonNumber });
+
+      if (week.weekTitle && !group.weekTitle) {
+        group.weekTitle = week.weekTitle;
+      }
     });
 
   return [...groups.values()].sort((a, b) => a.groupNumber - b.groupNumber);
@@ -3324,7 +3329,7 @@ export default function DashboardPage() {
                         <div style={s.weekGroupLabel}>
                           {group.groupNumber === 'Supplemental'
                             ? 'Supplemental Content'
-                            : `Week ${group.groupNumber}`}
+                            : `Week ${group.groupNumber}${group.weekTitle ? ` – ${group.weekTitle}` : ''}`}
                         </div>
                         <div style={s.weekGroupMeta}>
                           {groupItemCount} {showingVideos ? `video${groupItemCount === 1 ? '' : 's'}` : `session${groupItemCount === 1 ? '' : 's'}`}

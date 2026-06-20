@@ -292,6 +292,7 @@ async function createWeek(courseId, body) {
     category: body.category || 'module',
     weekNumber: body.weekNumber || 1,
     title: body.title || 'Untitled Week',
+    weekTitle: body.weekTitle || '',
     description: body.description || '',
     youtubeUrl: body.youtubeUrl || null,
     qaLink: body.qaLink || null,
@@ -325,7 +326,7 @@ async function updateWeek(courseId, weekId, body) {
   const fields = [
     'title', 'description', 'youtubeUrl', 'qaLink', 'visible', 'weekNumber',
     'category', 'quiz', 'resources', 'docs', 'assignments', 'liveRecordedSessions',
-    'calendarEvents', 'transcript'
+    'calendarEvents', 'transcript', 'weekTitle'
   ];
   const setClauses = [];
   const exprAttrValues = {};
