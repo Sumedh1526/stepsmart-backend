@@ -2758,11 +2758,11 @@ export default function DashboardPage() {
           }}
         >
           <div>
-            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'baseline', marginBottom: '0.35rem', paddingLeft: '0.15rem' }}>
-              <span style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', fontWeight: 600 }}>
-                {new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric' }).format(zonedTodayDate)}
+            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'baseline', marginBottom: '0.5rem', paddingLeft: '0.15rem' }}>
+              <span style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500 }}>
+                {new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(zonedTodayDate)}
               </span>
-              <span style={{ color: '#027A9B', fontSize: '0.75rem', fontWeight: 700 }}>
+              <span style={{ color: '#027A9B', fontSize: '0.875rem', fontWeight: 700 }}>
                 Daily Calendar
               </span>
             </div>
@@ -2777,8 +2777,6 @@ export default function DashboardPage() {
               {cells.map((d, idx) => {
                 if (d === null) return <div key={idx} style={{ height: `${cellHeight}px` }} />;
                 
-                const cellDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                const hasCompletedStreak = gymProgress.some(p => p.date === cellDateStr);
                 const isTodayCell = d === currentDay;
                 
                 let cellStyle = {
@@ -2800,9 +2798,6 @@ export default function DashboardPage() {
                   cellStyle.color = '#ffffff';
                   cellStyle.fontWeight = 'bold';
                   cellStyle.boxShadow = '0 2px 6px rgba(2, 122, 155, 0.25)';
-                } else if (hasCompletedStreak) {
-                  cellStyle.background = 'rgba(25, 135, 84, 0.12)';
-                  cellStyle.color = '#198754';
                 } else {
                   cellStyle.color = '#334155';
                 }
@@ -2810,18 +2805,7 @@ export default function DashboardPage() {
                 return (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: `${cellHeight}px` }}>
                     <div style={cellStyle}>
-                      {hasCompletedStreak ? (
-                        <span style={{
-                          color: isTodayCell ? '#ffffff' : '#198754',
-                          fontWeight: 'bold',
-                          fontSize: '0.65rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>✓</span>
-                      ) : (
-                        d
-                      )}
+                      {d}
                     </div>
                   </div>
                 );
@@ -3541,7 +3525,7 @@ export default function DashboardPage() {
             <div
               style={{
                 ...s.metricCards,
-                gridTemplateColumns: isCompact ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+                gridTemplateColumns: isCompact ? '1fr' : 'repeat(4, minmax(0, 1fr))',
               }}
             >
               {/* Redesigned Card 1: Lessons */}
@@ -3617,6 +3601,44 @@ export default function DashboardPage() {
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                     <span>Submit soon</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Redesigned Card 3: Streak */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(20, 49, 86, 0.08)',
+                  borderRadius: '20px',
+                  padding: '1.25rem',
+                  boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  height: '160px',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div>
+                  <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>
+                    Streak
+                  </div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>
+                    {gymStreak} {gymStreak === 1 ? 'day' : 'days'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '0.75rem' }}>
+                    {getLast7GymDays().map((dStr, i) => {
+                      const isActive = gymProgress.some(p => p.date === dStr);
+                      return (
+                        <div key={i} style={{ height: '6px', flex: 1, borderRadius: '999px', background: isActive ? '#198754' : '#e2e8f0', transition: 'background 0.3s ease' }} />
+                      );
+                    })}
+                  </div>
+                  <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8125rem' }}>
+                    {hasSolvedToday ? "Today's PM Gym complete!" : "Complete today's PM Gym quiz to keep it up!"}
                   </div>
                 </div>
               </div>
