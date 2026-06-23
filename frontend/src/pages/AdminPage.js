@@ -1888,6 +1888,162 @@ function SubmissionsTab({ courseId }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// PM Gym Responses Tab
+// ────────────────────────────────────────────────────────────────────────────────
+function GymSubmissionsTab({ courseId }) {
+  const [submissions, setSubmissions] = useState([]);
+  const [students, setStudents] = useState({});
+  const [gymQuestions, setGymQuestions] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { load(); }, [courseId]);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [progressRes, stuRes, weeksRes] = await Promise.all([
+        adminGetAllProgress(courseId),
+        adminGetStudents(courseId),
+        adminGetWeeks(courseId)
+      ]);
+      setSubmissions(progressRes.data.gymSubmissions || []);
+      
+      const studentMap = {};
+      for (const st of (stuRes.data.students || [])) {
+        studentMap[st.Username] = {
+          name: st.name || st.email || st.Username,
+          email: st.email || ''
+        };
+      }
+      setStudents(studentMap);
+
+      const gymMap = {};
+      for (const q of (weeksRes.data.gymQuestions || [])) {
+        gymMap[q.date] = q;
+      }
+      setGymQuestions(gymMap);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load PM Gym responses.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = submissions.filter(sub => {
+    const term = search.toLowerCase();
+    const studentInfo = students[sub.userId] || {};
+    const stSearchStr = `${studentInfo.name || ''} ${studentInfo.email || ''}`.toLowerCase();
+    const dateStr = (sub.date || '').toLowerCase();
+    const qInfo = gymQuestions[sub.date] || {};
+    const qText = (qInfo.text || '').toLowerCase();
+    return stSearchStr.includes(term) || dateStr.includes(term) || qText.includes(term);
+  });
+
+  if (loading) return <p style={{ color: 'var(--muted-foreground)' }}>Loading…</p>;
+  if (error) return <p style={{ color: 'var(--destructive)' }}>{error}</p>;
+
+  return (
+    <div style={s.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+        <div style={s.cardTitle}>PM Gym Responses — {courseId}</div>
+        <input 
+          style={{ ...s.input, width: '250px', marginBottom: 0 }} 
+          placeholder="Search by student, date, or question..." 
+          value={search} 
+          onChange={e => setSearch(e.target.value)} 
+        />
+      </div>
+      
+      {submissions.length === 0 ? <p style={{ color: 'var(--muted-foreground)' }}>No PM Gym responses recorded yet.</p> : (
+        <table style={s.table}>
+          <thead>
+            <tr>
+              <th style={s.th}>Student</th>
+              <th style={s.th}>Date & Question</th>
+              <th style={s.th}>Type</th>
+              <th style={s.th}>Submitted Answer</th>
+              <th style={s.th}>Status</th>
+              <th style={s.th}>Submitted At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((sub, i) => {
+              const studentInfo = students[sub.userId] || { name: sub.userId?.slice(0, 8) + '…', email: '' };
+              const question = gymQuestions[sub.date];
+              const isQuiz = sub.type === 'quiz';
+              
+              let answerDisplay = sub.answer;
+              if (isQuiz && question && question.options) {
+                const optIdx = parseInt(sub.answer, 10);
+                if (!isNaN(optIdx) && question.options[optIdx] !== undefined) {
+                  const optLetter = String.fromCharCode(65 + optIdx);
+                  answerDisplay = `Option ${optLetter}: ${question.options[optIdx]}`;
+                }
+              }
+              
+              let isCorrect = false;
+              if (isQuiz) {
+                isCorrect = question ? (parseInt(sub.answer, 10) === question.correctIndex) : (sub.score === 1);
+              } else {
+                isCorrect = question ? (String(sub.answer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase()) : (sub.score === 1);
+              }
+              
+              return (
+                <tr key={i}>
+                  <td style={s.td}>
+                    <div style={{ fontWeight: 600 }}>{studentInfo.name}</div>
+                    {studentInfo.email && studentInfo.name !== studentInfo.email && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>{studentInfo.email}</div>
+                    )}
+                  </td>
+                  <td style={s.td}>
+                    <div style={{ fontWeight: 600 }}>{sub.date}</div>
+                    {question && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={question.text}>
+                        {question.text}
+                      </div>
+                    )}
+                  </td>
+                  <td style={s.td}>
+                    <span style={{ ...s.badge, ...(isQuiz ? s.badgeSuccess : s.badgeInfo) }}>
+                      {isQuiz ? 'Quiz' : 'Text'}
+                    </span>
+                  </td>
+                  <td style={s.td}>
+                    <div style={{ maxWidth: '300px', wordBreak: 'break-word', fontSize: '0.875rem' }}>
+                      {answerDisplay}
+                    </div>
+                  </td>
+                  <td style={s.td}>
+                    <span style={{ ...s.badge, ...(isCorrect ? s.badgeSuccess : s.badgeWarning) }}>
+                      {isCorrect ? 'Correct' : 'Incorrect'}
+                    </span>
+                  </td>
+                  <td style={s.td}>
+                    {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan="6" style={{ ...s.td, textAlign: 'center', color: 'var(--muted-foreground)' }}>
+                  No matches found for "{search}"
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+
 // Leads Tab
 // ────────────────────────────────────────────────────────────────────────────────
 function LeadsTab() {
@@ -2308,6 +2464,7 @@ export default function AdminPage() {
           { id: 'students', label: 'Students' },
           { id: 'progress', label: 'Progress' },
           { id: 'submissions', label: 'Submissions' },
+          { id: 'gym-submissions', label: 'PM Gym Responses' },
           { id: 'leads', label: 'Leads' },
         ].map((t) => (
           <button
@@ -2328,6 +2485,7 @@ export default function AdminPage() {
         {tab === 'students' && <StudentsTab courseId={currentCourseId} />}
         {tab === 'progress' && <ProgressTab courseId={currentCourseId} />}
         {tab === 'submissions' && <SubmissionsTab courseId={currentCourseId} />}
+        {tab === 'gym-submissions' && <GymSubmissionsTab courseId={currentCourseId} />}
         {tab === 'leads' && <LeadsTab />}
       </div>
     </div>

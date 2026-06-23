@@ -520,19 +520,35 @@ async function getCourseProgress(courseId) {
     ExpressionAttributeValues: { ':cid': courseId },
   }));
 
-  const progress = (result.Items || []).map((item) => ({
-    userId: item.userId,
-    weekId: item.weekId,
-    videoComplete: item.videoComplete || false,
-    watchedSegments: item.watchedSegments ? [...item.watchedSegments] : [],
-    quizPassed: item.quizPassed || false,
-    quizScore: item.quizScore ?? null,
-    quizTotal: item.quizTotal ?? null,
-    quizAttempts: item.quizAttempts || 0,
-    lastSeen: item.lastSeen || null,
-  }));
+  const progress = [];
+  const gymSubmissions = [];
 
-  return res(200, { progress });
+  for (const item of (result.Items || [])) {
+    if (item.sk && item.sk.startsWith('GYM#')) {
+      gymSubmissions.push({
+        userId: item.userId || (item.pk ? item.pk.replace('USER#', '') : ''),
+        date: item.date,
+        type: item.type,
+        answer: item.answer,
+        score: item.score,
+        submittedAt: item.submittedAt,
+      });
+    } else {
+      progress.push({
+        userId: item.userId || (item.pk ? item.pk.replace('USER#', '') : ''),
+        weekId: item.weekId,
+        videoComplete: item.videoComplete || false,
+        watchedSegments: item.watchedSegments ? [...item.watchedSegments] : [],
+        quizPassed: item.quizPassed || false,
+        quizScore: item.quizScore ?? null,
+        quizTotal: item.quizTotal ?? null,
+        quizAttempts: item.quizAttempts || 0,
+        lastSeen: item.lastSeen || null,
+      });
+    }
+  }
+
+  return res(200, { progress, gymSubmissions });
 }
 
 // GET /admin/courses/{courseId}/submissions
