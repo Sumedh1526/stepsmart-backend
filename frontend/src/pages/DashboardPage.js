@@ -2658,7 +2658,9 @@ export default function DashboardPage() {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            minHeight: '145px',
+            height: '145px',
+            boxSizing: 'border-box',
+            overflowY: 'auto',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem', padding: '0 0.2rem' }}>
@@ -3452,7 +3454,8 @@ export default function DashboardPage() {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  minHeight: '145px',
+                  height: '145px',
+                  boxSizing: 'border-box',
                 }}
               >
                 <div>
@@ -3489,7 +3492,8 @@ export default function DashboardPage() {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  minHeight: '145px',
+                  height: '145px',
+                  boxSizing: 'border-box',
                 }}
               >
                 <div>
