@@ -1717,7 +1717,10 @@ function ProgressTab({ courseId }) {
 
       const studentMap = {};
       for (const st of (studentsRes.data.students || [])) {
-        studentMap[st.Username] = st.name || st.email || st.Username;
+        const displayName = st.name || st.email || st.Username;
+        if (st.Username) studentMap[st.Username] = displayName;
+        if (st.email) studentMap[st.email] = displayName;
+        if (st.sub) studentMap[st.sub] = displayName;
       }
       setStudents(studentMap);
 
@@ -1798,10 +1801,13 @@ function SubmissionsTab({ courseId }) {
       
       const studentMap = {};
       for (const st of (stuRes.data.students || [])) {
-        studentMap[st.Username] = {
+        const info = {
           name: st.name || st.email || st.Username,
           email: st.email || ''
         };
+        if (st.Username) studentMap[st.Username] = info;
+        if (st.email) studentMap[st.email] = info;
+        if (st.sub) studentMap[st.sub] = info;
       }
       setStudents(studentMap);
     } catch {
@@ -1897,6 +1903,7 @@ function GymSubmissionsTab({ courseId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [activeModalAnswer, setActiveModalAnswer] = useState(null);
 
   useEffect(() => { load(); }, [courseId]);
 
@@ -1912,10 +1919,13 @@ function GymSubmissionsTab({ courseId }) {
       
       const studentMap = {};
       for (const st of (stuRes.data.students || [])) {
-        studentMap[st.Username] = {
+        const info = {
           name: st.name || st.email || st.Username,
           email: st.email || ''
         };
+        if (st.Username) studentMap[st.Username] = info;
+        if (st.email) studentMap[st.email] = info;
+        if (st.sub) studentMap[st.sub] = info;
       }
       setStudents(studentMap);
 
@@ -1944,6 +1954,58 @@ function GymSubmissionsTab({ courseId }) {
 
   if (loading) return <p style={{ color: 'var(--muted-foreground)' }}>Loading…</p>;
   if (error) return <p style={{ color: 'var(--destructive)' }}>{error}</p>;
+
+  const modalOverlayStyle = {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.45)',
+    backdropFilter: 'blur(8px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 99999,
+    padding: '1rem',
+  };
+  const modalContentStyle = {
+    background: 'var(--card)',
+    borderRadius: '16px',
+    padding: '1.75rem',
+    width: '90%',
+    maxWidth: '550px',
+    boxShadow: '0 20px 40px -5px rgba(0, 0, 0, 0.15)',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    border: '1px solid var(--border)',
+  };
+  const modalHeaderStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.25rem',
+    borderBottom: '1px solid var(--border)',
+    paddingBottom: '0.75rem',
+  };
+  const modalCloseBtnStyle = {
+    background: 'none',
+    border: 'none',
+    fontSize: '1.2rem',
+    cursor: 'pointer',
+    color: 'var(--muted-foreground)',
+  };
+  const detailLabelStyle = {
+    fontSize: '0.7rem',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    fontWeight: 700,
+    color: 'var(--muted-foreground)',
+    marginBottom: '0.2rem',
+  };
+  const detailValueStyle = {
+    fontSize: '0.9rem',
+    color: 'var(--foreground)',
+    lineHeight: '1.45',
+  };
 
   return (
     <div style={s.card}>
@@ -1990,6 +2052,9 @@ function GymSubmissionsTab({ courseId }) {
               } else {
                 isCorrect = question ? (String(sub.answer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase()) : (sub.score === 1);
               }
+
+              const isLong = answerDisplay && answerDisplay.length > 80;
+              const displayAnswerText = isLong ? `${answerDisplay.slice(0, 80)}...` : answerDisplay;
               
               return (
                 <tr key={i}>
@@ -2013,8 +2078,36 @@ function GymSubmissionsTab({ courseId }) {
                     </span>
                   </td>
                   <td style={s.td}>
-                    <div style={{ maxWidth: '300px', wordBreak: 'break-word', fontSize: '0.875rem' }}>
-                      {answerDisplay}
+                    <div 
+                      onClick={() => setActiveModalAnswer({
+                        studentName: studentInfo.name,
+                        studentEmail: studentInfo.email,
+                        date: sub.date,
+                        questionText: question?.text,
+                        isQuiz,
+                        answerDisplay,
+                        isCorrect,
+                        submittedAt: sub.submittedAt
+                      })}
+                      style={{ 
+                        maxWidth: '350px', 
+                        wordBreak: 'break-word', 
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        borderRadius: '4px',
+                        transition: 'background 0.15s'
+                      }}
+                      title="Click to view full details"
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--muted)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      {displayAnswerText}
+                      {isLong && (
+                        <span style={{ color: 'var(--primary)', fontWeight: 600, marginLeft: '6px', fontSize: '0.75rem', textDecoration: 'underline' }}>
+                          (view)
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td style={s.td}>
@@ -2037,6 +2130,77 @@ function GymSubmissionsTab({ courseId }) {
             )}
           </tbody>
         </table>
+      )}
+
+      {activeModalAnswer && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <div style={modalHeaderStyle}>
+              <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)' }}>
+                PM Gym Response Details
+              </span>
+              <button type="button" onClick={() => setActiveModalAnswer(null)} style={modalCloseBtnStyle}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <div style={detailLabelStyle}>Student</div>
+                <div style={detailValueStyle}>
+                  <strong>{activeModalAnswer.studentName}</strong> {activeModalAnswer.studentEmail && `(${activeModalAnswer.studentEmail})`}
+                </div>
+              </div>
+              <div>
+                <div style={detailLabelStyle}>Date & Question</div>
+                <div style={detailValueStyle}>
+                  <strong>{activeModalAnswer.date}</strong>
+                  {activeModalAnswer.questionText && (
+                    <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: 'var(--muted-foreground)', whiteSpace: 'pre-wrap' }}>
+                      {activeModalAnswer.questionText}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div style={detailLabelStyle}>Type</div>
+                <div style={detailValueStyle}>
+                  <span style={{ ...s.badge, ...(activeModalAnswer.isQuiz ? s.badgeSuccess : activeModalAnswer.isInfo || s.badgeInfo) }}>
+                    {activeModalAnswer.isQuiz ? 'Quiz' : 'Text'}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div style={detailLabelStyle}>Submitted Answer</div>
+                <div style={{ 
+                  ...detailValueStyle, 
+                  whiteSpace: 'pre-wrap', 
+                  maxHeight: '200px', 
+                  overflowY: 'auto', 
+                  background: 'var(--background)', 
+                  padding: '0.75rem', 
+                  borderRadius: '6px', 
+                  border: '1px solid var(--border)' 
+                }}>
+                  {activeModalAnswer.answerDisplay}
+                </div>
+              </div>
+              <div>
+                <div style={detailLabelStyle}>Status</div>
+                <div style={detailValueStyle}>
+                  <span style={{ ...s.badge, ...(activeModalAnswer.isCorrect ? s.badgeSuccess : s.badgeWarning) }}>
+                    {activeModalAnswer.isCorrect ? 'Correct' : 'Incorrect'}
+                  </span>
+                </div>
+              </div>
+              {activeModalAnswer.submittedAt && (
+                <div>
+                  <div style={detailLabelStyle}>Submitted At</div>
+                  <div style={detailValueStyle}>
+                    {new Date(activeModalAnswer.submittedAt).toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

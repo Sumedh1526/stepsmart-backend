@@ -193,7 +193,7 @@ async function listStudents(courseId, event) {
     .filter(u => {
       const attrs = {};
       for (const a of u.Attributes || []) attrs[a.Name] = a.Value;
-      return enrolledUserIds.has(u.Username) || enrolledUserIds.has(attrs.sub);
+      return enrolledUserIds.has(u.Username) || enrolledUserIds.has(attrs.sub) || (attrs.email && enrolledUserIds.has(attrs.email));
     })
     .map((u) => {
       const attrs = {};
@@ -204,6 +204,7 @@ async function listStudents(courseId, event) {
         UserCreateDate: u.UserCreateDate,
         email: attrs.email || '',
         name: attrs.name || '',
+        sub: attrs.sub || '',
       };
     });
 
