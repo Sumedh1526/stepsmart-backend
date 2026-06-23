@@ -2647,7 +2647,7 @@ export default function DashboardPage() {
                           {rem.title}
                         </span>
                         {rem.deadline && (
-                          <span style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 500 }}>
+                          <span style={{ fontSize: '0.7rem', color: '#027A9B', fontWeight: 600 }}>
                             {rem.deadline}
                           </span>
                         )}
@@ -2660,22 +2660,24 @@ export default function DashboardPage() {
                             bottom: '100%',
                             left: '50%',
                             transform: 'translateX(-50%) translateY(-8px)',
-                            background: '#1e293b',
-                            color: '#f8fafc',
-                            padding: '0.65rem 0.85rem',
+                            background: '#ffffff',
+                            color: '#334155',
+                            padding: '0.75rem 0.9rem',
                             borderRadius: '8px',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                            border: '1px solid rgba(20, 49, 86, 0.12)',
+                            boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
                             zIndex: 100,
-                            minWidth: '180px',
-                            maxWidth: '260px',
+                            minWidth: '200px',
+                            maxWidth: '280px',
                             fontSize: '0.75rem',
-                            lineHeight: '1.4',
+                            lineHeight: '1.45',
                             pointerEvents: 'auto',
+                            textAlign: 'left',
                           }}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div style={{ fontWeight: 600, marginBottom: '0.2rem', color: '#38bdf8' }}>Details</div>
-                          <div style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>{renderTextWithLinks(rem.description)}</div>
+                          <div style={{ fontWeight: 700, marginBottom: '0.25rem', color: '#027A9B', fontSize: '0.8125rem' }}>Details</div>
+                          <div style={{ wordBreak: 'break-word', whiteSpace: 'normal', fontWeight: 500 }}>{renderTextWithLinks(rem.description)}</div>
                           <div
                             style={{
                               position: 'absolute',
@@ -2686,7 +2688,21 @@ export default function DashboardPage() {
                               height: 0,
                               borderLeft: '6px solid transparent',
                               borderRight: '6px solid transparent',
-                              borderTop: '6px solid #1e293b',
+                              borderTop: '6px solid #ffffff',
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '50%',
+                              transform: 'translateX(-50%) translateY(1px)',
+                              width: 0,
+                              height: 0,
+                              borderLeft: '6px solid transparent',
+                              borderRight: '6px solid transparent',
+                              borderTop: '6px solid rgba(20, 49, 86, 0.12)',
+                              zIndex: -1,
                             }}
                           />
                         </div>
