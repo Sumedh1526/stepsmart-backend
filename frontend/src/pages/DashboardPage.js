@@ -2494,7 +2494,6 @@ export default function DashboardPage() {
       ? `ACTIVE COURSE: ${activeCourse.name}${currentGroup ? ` (Week ${currentGroup.groupNumber})` : ''}`
       : 'ACTIVE COURSE: Not assigned yet';
 
-    const gymStreak = calculateGymStreak(user?.username);
     const todayStr = toDateKey(new Date());
     const hasSolvedToday = localStorage.getItem(`pm_gym_completed_${user?.username}_${todayStr}`) === 'true';
 
@@ -3052,7 +3051,7 @@ export default function DashboardPage() {
             <div
               style={{
                 ...s.metricCards,
-                gridTemplateColumns: isCompact ? '1fr' : 'repeat(4, minmax(0, 1fr))',
+                gridTemplateColumns: isCompact ? '1fr' : 'repeat(3, minmax(0, 1fr))',
               }}
             >
               {/* Redesigned Card 1: Lessons */}
@@ -3126,46 +3125,6 @@ export default function DashboardPage() {
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
                     <span>1 overdue soon</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Redesigned Card 3: Streak */}
-              <div
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid rgba(20, 49, 86, 0.08)',
-                  borderRadius: '20px',
-                  padding: '1.25rem',
-                  boxShadow: '0 8px 24px rgba(15, 40, 80, 0.04)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minHeight: '145px',
-                }}
-              >
-                <div>
-                  <div style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>
-                    Streak
-                  </div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem' }}>
-                    {gymStreak} {gymStreak === 1 ? 'day' : 'days'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '0.75rem' }}>
-                    {Array.from({ length: 7 }, (_, i) => {
-                      const d = new Date();
-                      d.setDate(d.getDate() - (6 - i));
-                      const dStr = toDateKey(d);
-                      const isActive = localStorage.getItem(`pm_gym_completed_${user?.username}_${dStr}`) === 'true';
-                      return (
-                        <div key={i} style={{ height: '6px', flex: 1, borderRadius: '999px', background: isActive ? '#198754' : '#e2e8f0', transition: 'background 0.3s ease' }} />
-                      );
-                    })}
-                  </div>
-                  <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8125rem' }}>
-                    {hasSolvedToday ? "Today's PM Gym complete!" : "Complete today's PM Gym quiz to keep it up!"}
                   </div>
                 </div>
               </div>
