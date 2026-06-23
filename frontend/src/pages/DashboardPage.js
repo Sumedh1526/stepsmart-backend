@@ -2558,7 +2558,7 @@ export default function DashboardPage() {
           }}
         >
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
               <span style={{ color: 'var(--muted-foreground)', fontSize: '0.875rem', fontWeight: 500 }}>
                 Weekly Reminder
               </span>
@@ -2570,39 +2570,23 @@ export default function DashboardPage() {
                 No weekly reminders.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '68px', overflowY: 'auto', paddingRight: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
                 {reminders.map((rem) => {
-                  const isChecked = localStorage.getItem(`reminder_${user?.username}_${rem.id}`) === 'true';
                   return (
-                    <div key={rem.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          localStorage.setItem(`reminder_${user?.username}_${rem.id}`, isChecked ? 'false' : 'true');
-                          setProgressMap(prev => ({ ...prev }));
-                        }}
-                        style={{
-                          marginTop: '0.15rem',
-                          cursor: 'pointer',
-                          accentColor: 'var(--primary)',
-                          width: '13px',
-                          height: '13px',
-                        }}
-                      />
+                    <div key={rem.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.45rem' }}>
+                      <span style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '0.8125rem', lineHeight: '1.2' }}>•</span>
                       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                         <span style={{
                           fontSize: '0.8125rem',
                           fontWeight: 550,
-                          color: isChecked ? 'var(--muted-foreground)' : 'var(--foreground)',
-                          textDecoration: isChecked ? 'line-through' : 'none',
+                          color: 'var(--foreground)',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                         }}>
                           {rem.title}
                         </span>
-                        {rem.deadline && !isChecked && (
+                        {rem.deadline && (
                           <span style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 500 }}>
                             {rem.deadline}
                           </span>
@@ -2613,11 +2597,6 @@ export default function DashboardPage() {
                 })}
               </div>
             )}
-          </div>
-          <div style={{ color: 'var(--muted-foreground)', fontSize: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.35rem', marginTop: '0.25rem' }}>
-            {reminders.length > 0
-              ? `${reminders.filter(r => localStorage.getItem(`reminder_${user?.username}_${r.id}`) === 'true').length}/${reminders.length} completed`
-              : '0 reminders'}
           </div>
         </div>
       );
