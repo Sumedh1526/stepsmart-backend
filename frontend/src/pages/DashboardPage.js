@@ -1881,12 +1881,7 @@ function DashboardLeaderboard({ me, rows, displayName, isCompact }) {
               key={entry.userId}
               style={{
                 ...s.railRow,
-                padding: isMe ? '0.65rem 0.75rem' : s.railRow.padding,
                 background: isMe ? 'linear-gradient(135deg, rgba(2, 122, 155, 0.08) 0%, rgba(2, 122, 155, 0.02) 100%)' : 'transparent',
-                border: isMe ? '1.5px solid rgba(2, 122, 155, 0.28)' : s.railRow.borderBottom,
-                borderRadius: isMe ? '16px' : '0',
-                margin: isMe ? '6px 0' : '0',
-                boxShadow: isMe ? '0 4px 12px rgba(2, 122, 155, 0.05)' : 'none',
               }}
             >
               <div style={{ ...s.railAvatar, background: gradient, border: 'none', color: '#1e293b' }}>
@@ -2392,9 +2387,10 @@ export default function DashboardPage() {
   const weekGroups = buildWeekGroups(weeks);
   const recordedSessionGroups = buildRecordedSessionGroups(weeks);
   const courseAssignments = buildAssignments(weeks);
-  const completedCount = weeks.filter((week) => weekStatus(week, progressMap[week.weekId]) === 'complete').length;
-  const remainingCount = Math.max(weeks.length - completedCount, 0);
-  const progressPercent = weeks.length > 0 ? Math.round((completedCount / weeks.length) * 100) : 0;
+  const lessonsWeeks = weeks.filter((week) => week.weekId !== '__supplemental__');
+  const completedCount = lessonsWeeks.filter((week) => weekStatus(week, progressMap[week.weekId]) === 'complete').length;
+  const remainingCount = Math.max(lessonsWeeks.length - completedCount, 0);
+  const progressPercent = lessonsWeeks.length > 0 ? Math.round((completedCount / lessonsWeeks.length) * 100) : 0;
   const leaderboardRows = (leaderboard || []).filter((entry) => entry.totalPoints > 0 || entry.isCurrentUser);
   const myLeaderboardEntry = leaderboardRows.find((entry) => entry.isCurrentUser) || null;
   const topLeaderboard = leaderboardRows.slice(0, 6);
@@ -3438,12 +3434,12 @@ export default function DashboardPage() {
                   </div>
                   <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'baseline' }}>
                     <span>{completedCount}</span>
-                    <span style={{ fontSize: '1.25rem', color: '#94a3b8', fontWeight: 500 }}>/{weeks.length}</span>
+                    <span style={{ fontSize: '1.25rem', color: '#94a3b8', fontWeight: 500 }}>/{lessonsWeeks.length}</span>
                   </div>
                 </div>
                 <div>
                   <div style={{ height: '6px', borderRadius: '999px', width: '100%', background: '#e2e8f0', overflow: 'hidden', marginBottom: '0.75rem' }}>
-                    <div style={{ height: '100%', borderRadius: '999px', background: 'var(--primary)', width: `${weeks.length > 0 ? (completedCount / weeks.length) * 100 : 0}%`, transition: 'width 0.3s ease' }} />
+                    <div style={{ height: '100%', borderRadius: '999px', background: 'var(--primary)', width: `${lessonsWeeks.length > 0 ? (completedCount / lessonsWeeks.length) * 100 : 0}%`, transition: 'width 0.3s ease' }} />
                   </div>
                   <div style={{ color: 'var(--muted-foreground)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
@@ -3480,16 +3476,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ height: '6px', borderRadius: '999px', width: '100%', background: '#e2e8f0', overflow: 'hidden', marginBottom: '0.75rem' }}>
+                  <div style={{ height: '6px', borderRadius: '999px', width: '100%', background: '#e2e8f0', overflow: 'hidden' }}>
                     <div style={{ height: '100%', borderRadius: '999px', background: '#df3b3b', width: `${assignmentsTotal > 0 ? (assignmentsSubmittedCount / assignmentsTotal) * 100 : 0}%`, transition: 'width 0.3s ease' }} />
-                  </div>
-                  <div style={{ color: '#df3b3b', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 500 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                    <span>1 overdue soon</span>
                   </div>
                 </div>
               </div>
