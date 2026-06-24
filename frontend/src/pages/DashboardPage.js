@@ -3193,15 +3193,13 @@ export default function DashboardPage() {
       if (!day) return null;
       
       const isPast = !day.isToday && !day.isFuture;
-      const isLast = idx === 3;
-      const isFirst = idx === 0;
       
       return (
         <div
           style={{
             position: 'absolute',
             bottom: '36px',
-            width: '280px',
+            width: '240px',
             background: '#ffffff',
             borderRadius: '16px',
             padding: '1rem',
@@ -3210,11 +3208,9 @@ export default function DashboardPage() {
             color: '#0f172a',
             zIndex: 10,
             textAlign: 'left',
-            ...(isLast
-              ? { right: '-12px', left: 'auto', transform: 'none' }
-              : isFirst
-                ? { left: '-12px', right: 'auto', transform: 'none' }
-                : { left: '50%', transform: 'translateX(-50%)' }
+            ...(idx === 0
+              ? { left: '-12px', right: 'auto', transform: 'none' }
+              : { right: '-12px', left: 'auto', transform: 'none' }
             ),
           }}
         >
@@ -3225,9 +3221,6 @@ export default function DashboardPage() {
               </div>
               {day.question ? (
                 <div>
-                  <p style={{ fontSize: '0.8rem', fontWeight: 700, margin: '0 0 0.5rem 0', lineHeight: '1.3' }}>
-                    {day.question.text}
-                  </p>
                   <div style={{ fontSize: '0.75rem', background: '#f8fafc', padding: '0.4rem 0.6rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
                     <span style={{ fontWeight: 600, color: 'var(--muted-foreground)' }}>Your Answer: </span>
                     {day.submission ? (
@@ -3241,7 +3234,7 @@ export default function DashboardPage() {
                       <span style={{ fontWeight: 700, color: 'var(--destructive)' }}>Not Attempted</span>
                     )}
                   </div>
-                  <div style={{ fontSize: '0.75rem', background: 'rgba(2, 122, 155, 0.05)', padding: '0.4rem 0.6rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', background: 'rgba(2, 122, 155, 0.05)', padding: '0.4rem 0.6rem', borderRadius: '8px', marginBottom: '0px' }}>
                     <span style={{ fontWeight: 600, color: '#027A9B' }}>Correct Answer: </span>
                     <span style={{ fontWeight: 700, color: '#027A9B' }}>
                       {day.question.type === 'quiz'
@@ -3250,11 +3243,6 @@ export default function DashboardPage() {
                       }
                     </span>
                   </div>
-                  {day.question.explanation && (
-                    <p style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)', margin: 0, lineHeight: '1.3' }}>
-                      <strong>Explanation: </strong>{day.question.explanation}
-                    </p>
-                  )}
                 </div>
               ) : (
                 <p style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', margin: 0 }}>
